@@ -1,0 +1,24 @@
+     1                                  ;64-bit "Hello World!" in Linux NASM
+     2                                  
+     3                                  global  main               ; global entry point export for ld
+     4                                  
+     5                                  section .text
+     6                                  main:
+     7                                    
+     8 00000000 B801000000                  	mov	rax, 1          ; sys_write
+     9 00000005 BF01000000                  	mov    	rdi, 1          ; stdout
+    10 0000000A 48BE-                       	mov    	rsi, message    ; message address
+    10 0000000C [0000000000000000] 
+    11 00000014 BA13000000                  	mov    	rdx, length     ; message string length
+    12 00000019 0F05                        	syscall
+    13                                  ; program suspended waiting for write to terminal
+    14                                   
+    15 0000001B B83C000000                  	mov    	rax, 60         ; sys_exit
+    16 00000020 4831FF                      	xor    	rdi, rdi        ; return 0 (success)
+    17 00000023 0F05                        	syscall
+    18                                  
+    19                                  section .data
+    20 00000000 0D0A48656C6C6F2C20-     message: db   0Dh,0Ah,'Hello, World!',0Dh,0Ah,0Dh,0Ah   ; message and CRLF
+    20 00000009 576F726C64210D0A0D-
+    20 00000012 0A                 
+    21                                  length:  equ  $-message        ; NASM definition pseudo-instruction
