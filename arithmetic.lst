@@ -417,9 +417,8 @@
     86 000000F3 415541564157       
     87 000000F9 4C8B1425[AC000000]      	mov	r10, [ipbuffer]
     88 00000101 418A02                  	mov	al, [r10]	; only checking first byte for q
-    89 00000104 41B971000000            	mov	r9, "q"
-    90                                  	cmp	al, r9		; checking to see if it's q
-    90          ******************       error: invalid combination of opcode and operands
+    89 00000104 41B171                  	mov	r9b, "q"
+    90 00000107 4438C8                  	cmp	al, r9b		; checking to see if it's q
     91 0000010A 7402                    	je	isq
     92 0000010C 751C                    	jne	isntq
     93                                  isq	equ	$

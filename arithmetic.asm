@@ -86,8 +86,8 @@ checkX:
 	SaveRegs		; no need to clobber registers
 	mov	r10, [ipbuffer]
 	mov	al, [r10]	; only checking first byte for q
-	mov	r9, "q"
-	cmp	al, r9		; checking to see if it's q
+	mov	r9b, "q"
+	cmp	al, r9b		; checking to see if it's q
 	je	isq
 	jne	isntq
 isq	equ	$
