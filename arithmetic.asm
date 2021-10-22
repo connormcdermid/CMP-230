@@ -131,7 +131,7 @@ main:
 ;	call	ParseInteger64	; convert to signed binary
 	call	getOperand
 	cmp	rbx, 0
-	jg	term
+	jg	err
 	mov	[num2], rax	; store signed bin
 
 	call	Crlf
@@ -158,19 +158,19 @@ postres	equ	$
 	call	Crlf
 	mov	rcx, [rem]
 	cmp	rcx, 0
-	jz	term		; if no remainder, jump to end
+	jz	recurse		; if no remainder, jump to end
 	mov	rdx, remmsg	; if remainder, print it
 	call	WriteString
 	mov	rax, rcx	; remainder's already in rcx
 	call	WriteInt
 	call	Crlf
-	jmp	term
+	jmp	recurse
 
 err	equ	$
 	mov	rdx, errmsg	; print error message
 	call	WriteString
 	call	Crlf
-	jmp	term		; terminate program
+	jmp	recurse
 
 myAdd	equ	$
 	add	rax, rbx	; add loaded registers
@@ -211,6 +211,8 @@ term	equ	$
 	call	WriteString
 	call	Crlf
 	Exit
+recurse equ	$
+	call main	; sneaky recursion for looping
 
 section .data
 

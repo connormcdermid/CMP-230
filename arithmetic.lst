@@ -410,10 +410,10 @@
     81                                  ; Check if user wants to exit the program
     82                                  ; INPUTS: User input in ipbuffer
     83                                  ; OUTPUTS: Sets ZF to 1 if user wants to exit
-    84                                  ; BUGS: Causes a segmentation fault.
+    84                                  ; CLOBBERS: RAX, r9, r10
     85                                  checkX:
     86 000000E1 4C8B1425[AC000000]      	mov	r10, [ipbuffer]
-    87                                  ;	mov	al, [r10]	; only checking first byte for q CAUSES SEGMENTATION FAULT
+    87                                  ;	mov	al, [r10]	; only checking first byte for q
     88 000000E9 41B171                  	mov	r9b, "q"
     89 000000EC 4538CA                  	cmp	r10b, r9b		; checking to see if it's q, comparing low byte of r10
     90 000000EF 7402                    	je	isq
@@ -462,7 +462,7 @@
    131                                  ;	call	ParseInteger64	; convert to signed binary
    132 00000152 E8E9FEFFFF              	call	getOperand
    133 00000157 4883FB00                	cmp	rbx, 0
-   134 0000015B 0F8F3C010000            	jg	term
+   134 0000015B 0F8F9E000000            	jg	err
    135 00000161 48890425[43000000]      	mov	[num2], rax	; store signed bin
    136                                  
    137 00000169 E8(00000000)            	call	Crlf
@@ -490,21 +490,21 @@
    158 000001C7 E8(00000000)            	call	Crlf
    159 000001CC 488B0C25[54000000]      	mov	rcx, [rem]
    160 000001D4 4883F900                	cmp	rcx, 0
-   161 000001D8 0F84BF000000            	jz	term		; if no remainder, jump to end
+   161 000001D8 0F84DD000000            	jz	recurse		; if no remainder, jump to end
    162 000001DE 48BA-                   	mov	rdx, remmsg	; if remainder, print it
    162 000001E0 [6500000000000000] 
    163 000001E8 E8(00000000)            	call	WriteString
    164 000001ED 4889C8                  	mov	rax, rcx	; remainder's already in rcx
    165 000001F0 E8(00000000)            	call	WriteInt
    166 000001F5 E8(00000000)            	call	Crlf
-   167 000001FA E99E000000              	jmp	term
+   167 000001FA E9BC000000              	jmp	recurse
    168                                  
    169                                  err	equ	$
    170 000001FF 48BA-                   	mov	rdx, errmsg	; print error message
    170 00000201 [7800000000000000] 
    171 00000209 E8(00000000)            	call	WriteString
    172 0000020E E8(00000000)            	call	Crlf
-   173 00000213 E985000000              	jmp	term		; terminate program
+   173 00000213 E9A3000000              	jmp	recurse
    174                                  
    175                                  myAdd	equ	$
    176 00000218 4801D8                  	add	rax, rbx	; add loaded registers
@@ -547,35 +547,37 @@
    212 000002AC E8(00000000)            	call	Crlf
    213 000002B1 B83C0000004831FF0F-     	Exit
    213 000002BA 05                 
-   214                                  
-   215                                  section .data
+   214                                  recurse equ	$
+   215 000002BB E83BFEFFFF              	call main	; sneaky recursion for looping
    216                                  
-   217 00000000 2020202000              tabchar	db	20h,20h,20h,20h,00h	; For use in formatting output: looks really ugly without it
-   218 00000005 506C6561736520656E-     prompt1	db 	"Please enter an operand: ",00h	; First prompt & NULL
-   218 0000000E 74657220616E206F70-
-   218 00000017 6572616E643A2000   
-   219 0000001F 506C6561736520656E-     prompt2	db	"Please enter the operator: ",00h	; second prompt & NULL
-   219 00000028 74657220746865206F-
-   219 00000031 70657261746F723A20-
-   219 0000003A 00                 
-   220                                  ;prompt3	db	"Please enter the second number: ",00h	; third prompt & NULL
-   221 0000003B 0000000000000000        num1	dq	00h
-   222 00000043 0000000000000000        num2	dq	00h
-   223 0000004B 20                      oper	db	20h
-   224 0000004C 0000000000000000        result	dq	00h
-   225 00000054 00                      rem 	db	00h
-   226 00000055 54686520524553554C-     resmsg	db	"The RESULT is: ",00h
-   226 0000005E 542069733A2000     
-   227 00000065 7468652052454D4149-     remmsg	db	"the REMAINDER is: ",00h
-   227 0000006E 4E4445522069733A20-
-   227 00000077 00                 
-   228 00000078 496E76616C6964206F-     errmsg	db	"Invalid operator.",00h
-   228 00000081 70657261746F722E00 
-   229 0000008A 42616420696E746567-     badmsg	db	"Bad integer.",00h
-   229 00000093 65722E00           
-   230 00000097 50726F6772616D2074-     eopmsg	db	"Program terminating.",00h
-   230 000000A0 65726D696E6174696E-
-   230 000000A9 672E00             
-   231 000000AC 20<rep FFh>             ipbuffer times 	255 db 20h	; define buffer of spaces
-   232                                  ipbuflen equ	$-ipbuffer
-   233 000001AB 0000000000000000        multbuf	dq	00h	; multiplication result buffer
+   217                                  section .data
+   218                                  
+   219 00000000 2020202000              tabchar	db	20h,20h,20h,20h,00h	; For use in formatting output: looks really ugly without it
+   220 00000005 506C6561736520656E-     prompt1	db 	"Please enter an operand: ",00h	; First prompt & NULL
+   220 0000000E 74657220616E206F70-
+   220 00000017 6572616E643A2000   
+   221 0000001F 506C6561736520656E-     prompt2	db	"Please enter the operator: ",00h	; second prompt & NULL
+   221 00000028 74657220746865206F-
+   221 00000031 70657261746F723A20-
+   221 0000003A 00                 
+   222                                  ;prompt3	db	"Please enter the second number: ",00h	; third prompt & NULL
+   223 0000003B 0000000000000000        num1	dq	00h
+   224 00000043 0000000000000000        num2	dq	00h
+   225 0000004B 20                      oper	db	20h
+   226 0000004C 0000000000000000        result	dq	00h
+   227 00000054 00                      rem 	db	00h
+   228 00000055 54686520524553554C-     resmsg	db	"The RESULT is: ",00h
+   228 0000005E 542069733A2000     
+   229 00000065 7468652052454D4149-     remmsg	db	"the REMAINDER is: ",00h
+   229 0000006E 4E4445522069733A20-
+   229 00000077 00                 
+   230 00000078 496E76616C6964206F-     errmsg	db	"Invalid operator.",00h
+   230 00000081 70657261746F722E00 
+   231 0000008A 42616420696E746567-     badmsg	db	"Bad integer.",00h
+   231 00000093 65722E00           
+   232 00000097 50726F6772616D2074-     eopmsg	db	"Program terminating.",00h
+   232 000000A0 65726D696E6174696E-
+   232 000000A9 672E00             
+   233 000000AC 20<rep FFh>             ipbuffer times 	255 db 20h	; define buffer of spaces
+   234                                  ipbuflen equ	$-ipbuffer
+   235 000001AB 0000000000000000        multbuf	dq	00h	; multiplication result buffer
