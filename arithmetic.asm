@@ -59,7 +59,7 @@ optest	equ	$		; top of loop
 	jmp	goodOp
 badOp	equ	$
 	call	checkX		; first, make sure user isn't trying to exit
-	jnz	term
+	jz	term
 	mov	rdx, badmsg
 	call	WriteString
 	call	Crlf
@@ -81,22 +81,19 @@ getReturn equ	$
 ; Check if user wants to exit the program
 ; INPUTS: User input in ipbuffer
 ; OUTPUTS: Sets ZF to 1 if user wants to exit
-; BUGS: Causes a segmentation fault.
+; CLOBBERS: RAX, r9, r10
 checkX:
-	SaveRegs		; no need to clobber registers
 	mov	r10, [ipbuffer]
-	mov	al, [r10]	; only checking first byte for q
+;	mov	al, [r10]	; only checking first byte for q
 	mov	r9b, "q"
-	cmp	al, r9b		; checking to see if it's q
+	cmp	r10b, r9b		; checking to see if it's q, comparing low byte of r10
 	je	isq
 	jne	isntq
 isq	equ	$
 	cmp	rax, rax	; set zero flag as per https://stackoverflow.com/a/54499552/7327253
-	RestoreRegs
 	ret 
 isntq	equ	$
 	test	r10, r10	; set zero flag as per https://stackoverflow.com/a/54499552/7327253
-	RestoreRegs
 	ret
 ; END SUBROUTINE
 ;-------------------------------------------------------------------

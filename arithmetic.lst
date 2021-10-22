@@ -386,7 +386,7 @@
     59 000000A4 EB26                    	jmp	goodOp
     60                                  badOp	equ	$
     61 000000A6 E836000000              	call	checkX		; first, make sure user isn't trying to exit
-    62 000000AB 0F8537020000            	jnz	term
+    62 000000AB 0F84EC010000            	jz	term
     63 000000B1 48BA-                   	mov	rdx, badmsg
     63 000000B3 [8A00000000000000] 
     64 000000BB E8(00000000)            	call	WriteString
@@ -412,179 +412,170 @@
     83                                  ; OUTPUTS: Sets ZF to 1 if user wants to exit
     84                                  ; BUGS: Causes a segmentation fault.
     85                                  checkX:
-    86 000000E1 505351525657555441-     	SaveRegs		; no need to clobber registers
-    86 000000EA 504151415241534154-
-    86 000000F3 415541564157       
-    87 000000F9 4C8B1425[AC000000]      	mov	r10, [ipbuffer]
-    88 00000101 418A02                  	mov	al, [r10]	; only checking first byte for q
-    89 00000104 41B171                  	mov	r9b, "q"
-    90 00000107 4438C8                  	cmp	al, r9b		; checking to see if it's q
-    91 0000010A 7402                    	je	isq
-    92 0000010C 751C                    	jne	isntq
-    93                                  isq	equ	$
-    94 0000010E 4839C0                  	cmp	rax, rax	; set zero flag as per https://stackoverflow.com/a/54499552/7327253
-    95 00000111 415F415E415D415C41-     	RestoreRegs
-    95 0000011A 5B415A415941585C5D-
-    95 00000123 5F5E5A595B58       
-    96 00000129 C3                      	ret 
-    97                                  isntq	equ	$
-    98 0000012A 4D85D2                  	test	r10, r10	; set zero flag as per https://stackoverflow.com/a/54499552/7327253
-    99 0000012D 415F415E415D415C41-     	RestoreRegs
-    99 00000136 5B415A415941585C5D-
-    99 0000013F 5F5E5A595B58       
-   100 00000145 C3                      	ret
-   101                                  ; END SUBROUTINE
-   102                                  ;-------------------------------------------------------------------
-   103                                   
-   104                                  main:
-   105                                  ;	mov	r8, 4		; r8 will be loop iterator variable
-   106                                  
-   107 00000146 E8(00000000)            	call	Crlf
-   108 0000014B E8F0FEFFFF              	call	getOperand
-   109 00000150 4883FB00                	cmp	rbx, 0		; is all clean?
-   110 00000154 0F8F8E010000            	jg	term
-   111 0000015A 48890425[3B000000]      	mov	[num1], rax	; store signed bin
-   112                                  
-   113 00000162 E8(00000000)            	call	Crlf
-   114 00000167 48BA-                   	mov	rdx, prompt2	; prompt user for operator
-   114 00000169 [1F00000000000000] 
-   115 00000171 E8(00000000)            	call	WriteString
-   116                                  	
-   117 00000176 48BA-                   	mov	rdx, ipbuffer
-   117 00000178 [AC00000000000000] 
-   118 00000180 B9FF000000              	mov	rcx, ipbuflen
-   119 00000185 E8(00000000)            	call	ReadString
+    86 000000E1 4C8B1425[AC000000]      	mov	r10, [ipbuffer]
+    87                                  ;	mov	al, [r10]	; only checking first byte for q CAUSES SEGMENTATION FAULT
+    88 000000E9 41B171                  	mov	r9b, "q"
+    89 000000EC 4538CA                  	cmp	r10b, r9b		; checking to see if it's q, comparing low byte of r10
+    90 000000EF 7402                    	je	isq
+    91 000000F1 7504                    	jne	isntq
+    92                                  isq	equ	$
+    93 000000F3 4839C0                  	cmp	rax, rax	; set zero flag as per https://stackoverflow.com/a/54499552/7327253
+    94 000000F6 C3                      	ret 
+    95                                  isntq	equ	$
+    96 000000F7 4D85D2                  	test	r10, r10	; set zero flag as per https://stackoverflow.com/a/54499552/7327253
+    97 000000FA C3                      	ret
+    98                                  ; END SUBROUTINE
+    99                                  ;-------------------------------------------------------------------
+   100                                   
+   101                                  main:
+   102                                  ;	mov	r8, 4		; r8 will be loop iterator variable
+   103                                  
+   104 000000FB E8(00000000)            	call	Crlf
+   105 00000100 E83BFFFFFF              	call	getOperand
+   106 00000105 4883FB00                	cmp	rbx, 0		; is all clean?
+   107 00000109 0F8F8E010000            	jg	term
+   108 0000010F 48890425[3B000000]      	mov	[num1], rax	; store signed bin
+   109                                  
+   110 00000117 E8(00000000)            	call	Crlf
+   111 0000011C 48BA-                   	mov	rdx, prompt2	; prompt user for operator
+   111 0000011E [1F00000000000000] 
+   112 00000126 E8(00000000)            	call	WriteString
+   113                                  	
+   114 0000012B 48BA-                   	mov	rdx, ipbuffer
+   114 0000012D [AC00000000000000] 
+   115 00000135 B9FF000000              	mov	rcx, ipbuflen
+   116 0000013A E8(00000000)            	call	ReadString
+   117                                  	
+   118 0000013F 8A1425[AC000000]        	mov	dl, [ipbuffer]	; store only the first byte of rdx
+   119 00000146 881425[4B000000]        	mov	[oper], dl	; store *that* in memory
    120                                  	
-   121 0000018A 8A1425[AC000000]        	mov	dl, [ipbuffer]	; store only the first byte of rdx
-   122 00000191 881425[4B000000]        	mov	[oper], dl	; store *that* in memory
-   123                                  	
-   124                                  
-   125 00000198 E8(00000000)            	call	Crlf
-   126                                  ;	mov	rdx, prompt3	; prompt user for number 2
-   127                                  ;	call	WriteString
-   128                                  	
-   129                                  ;	mov 	rdx, ipbuffer	; address the data buffer
-   130                                  ;	mov	rcx, ipbuflen	; limit data
-   131                                  ;	call	ReadString	; perform a keyboard read
-   132                                  ;	mov	rdx, ipbuffer	; address numeral input area
-   133                                  ;	mov	rcx, rax	; numeral count
-   134                                  ;	call	ParseInteger64	; convert to signed binary
-   135 0000019D E89EFEFFFF              	call	getOperand
-   136 000001A2 4883FB00                	cmp	rbx, 0
-   137 000001A6 0F8F3C010000            	jg	term
-   138 000001AC 48890425[43000000]      	mov	[num2], rax	; store signed bin
-   139                                  
-   140 000001B4 E8(00000000)            	call	Crlf
-   141                                  	
-   142 000001B9 488B0425[3B000000]      	mov	rax, [num1]	; load operand 1
-   143 000001C1 488B1C25[43000000]      	mov	rbx, [num2]	; load operand 2
-   144 000001C9 8A1425[4B000000]        	mov	dl, [oper]	; load operator
-   145                                  
-   146 000001D0 80FA2B                  	cmp	dl, "+"
-   147 000001D3 0F848A000000            	je	myAdd
-   148 000001D9 80FA2D                  	cmp	dl, "-"
-   149 000001DC 0F849F000000            	je	mySub
-   150 000001E2 80FA2A                  	cmp	dl, "*"
-   151 000001E5 0F84B4000000            	je	myMult
-   152 000001EB 80FA2F                  	cmp	dl, "/"
-   153 000001EE 0F84D5000000            	je	myDiv
-   154 000001F4 EB54                    	jmp	err		; default, invalid operator
-   155                                  
-   156                                  postres	equ	$
-   157 000001F6 48BA-                   	mov	rdx, resmsg	; post resmsg
-   157 000001F8 [5500000000000000] 
-   158 00000200 E8(00000000)            	call	WriteString
-   159 00000205 488B0425[4C000000]      	mov	rax, [result]	; load register with result
-   160 0000020D E8(00000000)            	call	WriteInt
-   161 00000212 E8(00000000)            	call	Crlf
-   162 00000217 488B0C25[54000000]      	mov	rcx, [rem]
-   163 0000021F 4883F900                	cmp	rcx, 0
-   164 00000223 0F84BF000000            	jz	term		; if no remainder, jump to end
-   165 00000229 48BA-                   	mov	rdx, remmsg	; if remainder, print it
-   165 0000022B [6500000000000000] 
-   166 00000233 E8(00000000)            	call	WriteString
-   167 00000238 4889C8                  	mov	rax, rcx	; remainder's already in rcx
-   168 0000023B E8(00000000)            	call	WriteInt
-   169 00000240 E8(00000000)            	call	Crlf
-   170 00000245 E99E000000              	jmp	term
-   171                                  
-   172                                  err	equ	$
-   173 0000024A 48BA-                   	mov	rdx, errmsg	; print error message
-   173 0000024C [7800000000000000] 
-   174 00000254 E8(00000000)            	call	WriteString
-   175 00000259 E8(00000000)            	call	Crlf
-   176 0000025E E985000000              	jmp	term		; terminate program
-   177                                  
-   178                                  myAdd	equ	$
-   179 00000263 4801D8                  	add	rax, rbx	; add loaded registers
-   180 00000266 48890425[4C000000]      	mov	[result], rax	; store sum
-   181 0000026E 41BA00000000            	mov	r10, 0
-   182 00000274 4C891425[54000000]      	mov	[rem], r10	; make sure remainder is 0
-   183 0000027C E975FFFFFF              	jmp	postres
-   184                                  
-   185                                  mySub	equ	$
-   186 00000281 4829D8                  	sub	rax, rbx	; add loaded registers
-   187 00000284 48890425[4C000000]      	mov	[result], rax	; store sum
-   188 0000028C 41BA00000000            	mov	r10, 0
-   189 00000292 4C891425[54000000]      	mov	[rem], r10	; make sure remainder is 0
-   190 0000029A E957FFFFFF              	jmp	postres
-   191                                  
-   192                                  myMult	equ	$	; outputs in RDX:RAX
-   193 0000029F 4899                    	cqo	; perpetuate RAX into RDX
-   194 000002A1 E8(00000000)            	call	DumpRegs
-   195 000002A6 48F7EB                  	imul	rbx	; rax, rbx already loaded with operands
-   196                                  ;	mov	[multbuf], rdx
-   197 000002A9 48890425[4C000000]      	mov	[result], rax
-   198                                  	;	add high-order bits 
-   199 000002B1 41BA00000000            	mov	r10, 0
-   200 000002B7 4C891425[54000000]      	mov	[rem], r10
-   201 000002BF E8(00000000)            	call	DumpRegs
-   202 000002C4 E92DFFFFFF              	jmp	postres
-   203                                  
-   204                                  myDiv	equ	$
-   205 000002C9 4899                    	cqo	; perpetuate RAX into RDX
-   206 000002CB E8(00000000)            	call	DumpRegs
-   207 000002D0 48F7FB                  	idiv	rbx	; RAX, RBX already loaded with operands
-   208 000002D3 48891425[54000000]      	mov	[rem], rdx
-   209 000002DB 48890425[4C000000]      	mov	[result], rax
-   210 000002E3 E90EFFFFFF              	jmp	postres
-   211                                  
-   212                                  term	equ	$
-   213 000002E8 48BA-                   	mov	rdx, eopmsg
-   213 000002EA [9700000000000000] 
-   214 000002F2 E8(00000000)            	call	WriteString
-   215 000002F7 E8(00000000)            	call	Crlf
-   216 000002FC B83C0000004831FF0F-     	Exit
-   216 00000305 05                 
-   217                                  
-   218                                  section .data
-   219                                  
-   220 00000000 2020202000              tabchar	db	20h,20h,20h,20h,00h	; For use in formatting output: looks really ugly without it
-   221 00000005 506C6561736520656E-     prompt1	db 	"Please enter an operand: ",00h	; First prompt & NULL
-   221 0000000E 74657220616E206F70-
-   221 00000017 6572616E643A2000   
-   222 0000001F 506C6561736520656E-     prompt2	db	"Please enter the operator: ",00h	; second prompt & NULL
-   222 00000028 74657220746865206F-
-   222 00000031 70657261746F723A20-
-   222 0000003A 00                 
-   223                                  ;prompt3	db	"Please enter the second number: ",00h	; third prompt & NULL
-   224 0000003B 0000000000000000        num1	dq	00h
-   225 00000043 0000000000000000        num2	dq	00h
-   226 0000004B 20                      oper	db	20h
-   227 0000004C 0000000000000000        result	dq	00h
-   228 00000054 00                      rem 	db	00h
-   229 00000055 54686520524553554C-     resmsg	db	"The RESULT is: ",00h
-   229 0000005E 542069733A2000     
-   230 00000065 7468652052454D4149-     remmsg	db	"the REMAINDER is: ",00h
-   230 0000006E 4E4445522069733A20-
-   230 00000077 00                 
-   231 00000078 496E76616C6964206F-     errmsg	db	"Invalid operator.",00h
-   231 00000081 70657261746F722E00 
-   232 0000008A 42616420696E746567-     badmsg	db	"Bad integer.",00h
-   232 00000093 65722E00           
-   233 00000097 50726F6772616D2074-     eopmsg	db	"Program terminating.",00h
-   233 000000A0 65726D696E6174696E-
-   233 000000A9 672E00             
-   234 000000AC 20<rep FFh>             ipbuffer times 	255 db 20h	; define buffer of spaces
-   235                                  ipbuflen equ	$-ipbuffer
-   236 000001AB 0000000000000000        multbuf	dq	00h	; multiplication result buffer
+   121                                  
+   122 0000014D E8(00000000)            	call	Crlf
+   123                                  ;	mov	rdx, prompt3	; prompt user for number 2
+   124                                  ;	call	WriteString
+   125                                  	
+   126                                  ;	mov 	rdx, ipbuffer	; address the data buffer
+   127                                  ;	mov	rcx, ipbuflen	; limit data
+   128                                  ;	call	ReadString	; perform a keyboard read
+   129                                  ;	mov	rdx, ipbuffer	; address numeral input area
+   130                                  ;	mov	rcx, rax	; numeral count
+   131                                  ;	call	ParseInteger64	; convert to signed binary
+   132 00000152 E8E9FEFFFF              	call	getOperand
+   133 00000157 4883FB00                	cmp	rbx, 0
+   134 0000015B 0F8F3C010000            	jg	term
+   135 00000161 48890425[43000000]      	mov	[num2], rax	; store signed bin
+   136                                  
+   137 00000169 E8(00000000)            	call	Crlf
+   138                                  	
+   139 0000016E 488B0425[3B000000]      	mov	rax, [num1]	; load operand 1
+   140 00000176 488B1C25[43000000]      	mov	rbx, [num2]	; load operand 2
+   141 0000017E 8A1425[4B000000]        	mov	dl, [oper]	; load operator
+   142                                  
+   143 00000185 80FA2B                  	cmp	dl, "+"
+   144 00000188 0F848A000000            	je	myAdd
+   145 0000018E 80FA2D                  	cmp	dl, "-"
+   146 00000191 0F849F000000            	je	mySub
+   147 00000197 80FA2A                  	cmp	dl, "*"
+   148 0000019A 0F84B4000000            	je	myMult
+   149 000001A0 80FA2F                  	cmp	dl, "/"
+   150 000001A3 0F84D5000000            	je	myDiv
+   151 000001A9 EB54                    	jmp	err		; default, invalid operator
+   152                                  
+   153                                  postres	equ	$
+   154 000001AB 48BA-                   	mov	rdx, resmsg	; post resmsg
+   154 000001AD [5500000000000000] 
+   155 000001B5 E8(00000000)            	call	WriteString
+   156 000001BA 488B0425[4C000000]      	mov	rax, [result]	; load register with result
+   157 000001C2 E8(00000000)            	call	WriteInt
+   158 000001C7 E8(00000000)            	call	Crlf
+   159 000001CC 488B0C25[54000000]      	mov	rcx, [rem]
+   160 000001D4 4883F900                	cmp	rcx, 0
+   161 000001D8 0F84BF000000            	jz	term		; if no remainder, jump to end
+   162 000001DE 48BA-                   	mov	rdx, remmsg	; if remainder, print it
+   162 000001E0 [6500000000000000] 
+   163 000001E8 E8(00000000)            	call	WriteString
+   164 000001ED 4889C8                  	mov	rax, rcx	; remainder's already in rcx
+   165 000001F0 E8(00000000)            	call	WriteInt
+   166 000001F5 E8(00000000)            	call	Crlf
+   167 000001FA E99E000000              	jmp	term
+   168                                  
+   169                                  err	equ	$
+   170 000001FF 48BA-                   	mov	rdx, errmsg	; print error message
+   170 00000201 [7800000000000000] 
+   171 00000209 E8(00000000)            	call	WriteString
+   172 0000020E E8(00000000)            	call	Crlf
+   173 00000213 E985000000              	jmp	term		; terminate program
+   174                                  
+   175                                  myAdd	equ	$
+   176 00000218 4801D8                  	add	rax, rbx	; add loaded registers
+   177 0000021B 48890425[4C000000]      	mov	[result], rax	; store sum
+   178 00000223 41BA00000000            	mov	r10, 0
+   179 00000229 4C891425[54000000]      	mov	[rem], r10	; make sure remainder is 0
+   180 00000231 E975FFFFFF              	jmp	postres
+   181                                  
+   182                                  mySub	equ	$
+   183 00000236 4829D8                  	sub	rax, rbx	; add loaded registers
+   184 00000239 48890425[4C000000]      	mov	[result], rax	; store sum
+   185 00000241 41BA00000000            	mov	r10, 0
+   186 00000247 4C891425[54000000]      	mov	[rem], r10	; make sure remainder is 0
+   187 0000024F E957FFFFFF              	jmp	postres
+   188                                  
+   189                                  myMult	equ	$	; outputs in RDX:RAX
+   190 00000254 4899                    	cqo	; perpetuate RAX into RDX
+   191 00000256 E8(00000000)            	call	DumpRegs
+   192 0000025B 48F7EB                  	imul	rbx	; rax, rbx already loaded with operands
+   193                                  ;	mov	[multbuf], rdx
+   194 0000025E 48890425[4C000000]      	mov	[result], rax
+   195                                  	;	add high-order bits 
+   196 00000266 41BA00000000            	mov	r10, 0
+   197 0000026C 4C891425[54000000]      	mov	[rem], r10
+   198 00000274 E8(00000000)            	call	DumpRegs
+   199 00000279 E92DFFFFFF              	jmp	postres
+   200                                  
+   201                                  myDiv	equ	$
+   202 0000027E 4899                    	cqo	; perpetuate RAX into RDX
+   203 00000280 E8(00000000)            	call	DumpRegs
+   204 00000285 48F7FB                  	idiv	rbx	; RAX, RBX already loaded with operands
+   205 00000288 48891425[54000000]      	mov	[rem], rdx
+   206 00000290 48890425[4C000000]      	mov	[result], rax
+   207 00000298 E90EFFFFFF              	jmp	postres
+   208                                  
+   209                                  term	equ	$
+   210 0000029D 48BA-                   	mov	rdx, eopmsg
+   210 0000029F [9700000000000000] 
+   211 000002A7 E8(00000000)            	call	WriteString
+   212 000002AC E8(00000000)            	call	Crlf
+   213 000002B1 B83C0000004831FF0F-     	Exit
+   213 000002BA 05                 
+   214                                  
+   215                                  section .data
+   216                                  
+   217 00000000 2020202000              tabchar	db	20h,20h,20h,20h,00h	; For use in formatting output: looks really ugly without it
+   218 00000005 506C6561736520656E-     prompt1	db 	"Please enter an operand: ",00h	; First prompt & NULL
+   218 0000000E 74657220616E206F70-
+   218 00000017 6572616E643A2000   
+   219 0000001F 506C6561736520656E-     prompt2	db	"Please enter the operator: ",00h	; second prompt & NULL
+   219 00000028 74657220746865206F-
+   219 00000031 70657261746F723A20-
+   219 0000003A 00                 
+   220                                  ;prompt3	db	"Please enter the second number: ",00h	; third prompt & NULL
+   221 0000003B 0000000000000000        num1	dq	00h
+   222 00000043 0000000000000000        num2	dq	00h
+   223 0000004B 20                      oper	db	20h
+   224 0000004C 0000000000000000        result	dq	00h
+   225 00000054 00                      rem 	db	00h
+   226 00000055 54686520524553554C-     resmsg	db	"The RESULT is: ",00h
+   226 0000005E 542069733A2000     
+   227 00000065 7468652052454D4149-     remmsg	db	"the REMAINDER is: ",00h
+   227 0000006E 4E4445522069733A20-
+   227 00000077 00                 
+   228 00000078 496E76616C6964206F-     errmsg	db	"Invalid operator.",00h
+   228 00000081 70657261746F722E00 
+   229 0000008A 42616420696E746567-     badmsg	db	"Bad integer.",00h
+   229 00000093 65722E00           
+   230 00000097 50726F6772616D2074-     eopmsg	db	"Program terminating.",00h
+   230 000000A0 65726D696E6174696E-
+   230 000000A9 672E00             
+   231 000000AC 20<rep FFh>             ipbuffer times 	255 db 20h	; define buffer of spaces
+   232                                  ipbuflen equ	$-ipbuffer
+   233 000001AB 0000000000000000        multbuf	dq	00h	; multiplication result buffer

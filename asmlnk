@@ -69,7 +69,7 @@ lstname=$pgmname'.lst'
 echo " "
 echo "Assemble program "$pgmname
 #set -x
-nasm -f elf64 $asmname -l $lstname
+nasm -f elf64 -F dwarf $asmname -l $lstname
 rc=$? 
 echo "$0...Assembly completed with RC=$rc..."
 if [ $rc != 0 ]
