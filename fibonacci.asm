@@ -14,11 +14,26 @@ ipbufln	equ	$-ipbuffer
 
 section .text
 
+;--------------------------------------------------------
+; SUBROUTINE: fib
+; INPUTS: Quantity
+; OUTPUTS: Requested numbers in RAX
+fib:
+	push 	rbp	; retrieve parameter and put it --
+	push	rbx	; save previous param
+	mov	rbp, rsp; -- into rax
+	
+	
+	
+; END SUBROUTINE: fib
+;--------------------------------------------------------
+
 main:
 
 ; keep looping until user quits
 loopnt	equ	$
 	call	Crlf
+
 	mov	rdx, prompt	; write user prompt
 	call	WriteString
 
@@ -28,3 +43,4 @@ loopnt	equ	$
 	mov	rdx, ipbuffer	; address numeral input area
 	mov	rcx, rax	; numeral count
 	call	ParseInteger64	; parse signed binary from input
+

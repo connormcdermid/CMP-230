@@ -1,0 +1,568 @@
+     1                                  ; ----------------------------------------------------------------------------
+     2                                  ; stackdemo
+     3                                  ;
+     4                                  ; Author: Geoffrey J. Cullen
+     5                                  ;
+     6                                  ; Function:
+     7                                  ; Demonstrate use and content of UNIX program stack between subroutine calls.
+     8                                  ; 
+     9                                  ; ----------------------------------------------------------------------------
+    10                                  %include "CPsub64.inc"
+    11                              <1> ; Last update: 2019/08/20
+    12                              <1> 
+    13                              <1> %ifndef CPSUB64
+    14                              <1> %define CPSUB64
+    15                              <1> 
+    16                              <1> ; ------------------------------------------
+    17                              <1> ; function prototypes
+    18                              <1> ; ------------------------------------------
+    19                              <1> extern Clearscr
+    20                              <1> extern CloseFile
+    21                              <1> extern Crlf
+    22                              <1> extern ClearBuffer
+    23                              <1> extern Delay
+    24                              <1> extern DumpMem
+    25                              <1> extern DumpCC
+    26                              <1> extern DumpEflags
+    27                              <1> extern DumpRegs
+    28                              <1> extern IsDigit
+    29                              <1> extern Mvcl
+    30                              <1> extern FileOpen
+    31                              <1> extern FileClose
+    32                              <1> extern FileRead
+    33                              <1> extern FileWrite
+    34                              <1> extern ParseDecimal32
+    35                              <1> extern ParseInteger32
+    36                              <1> extern ParseDecimal64
+    37                              <1> extern ParseInteger64
+    38                              <1> extern ReadChar
+    39                              <1> extern ReadDec
+    40                              <1> extern ReadHex
+    41                              <1> extern ReadInt
+    42                              <1> extern ReadKey
+    43                              <1> extern ReadString
+    44                              <1> extern ReadStr
+    45                              <1> extern Str_compare
+    46                              <1> extern Str_copy
+    47                              <1> extern Str_length
+    48                              <1> extern StrLength
+    49                              <1> extern Str_trim
+    50                              <1> extern Str_ucase
+    51                              <1> extern WriteBin
+    52                              <1> extern WriteBinB
+    53                              <1> extern WriteChar
+    54                              <1> extern WriteDec
+    55                              <1> extern WriteHex
+    56                              <1> extern WriteHexDbl
+    57                              <1> extern WriteHexB
+    58                              <1> extern WriteInt
+    59                              <1> extern WriteString
+    60                              <1> ; ------------------------------------------
+    61                              <1> 
+    62                              <1> %endif
+    11                                  %include "Macros_CPsub64.inc"
+    12                              <1> ;--------------------------- MACROS ------------------------------------------
+    13                              <1> ; Change Log:
+    14                              <1> ; 02-06-21 CP Rename ifndef for Exit from CPExit to Exit, update mShowRegister
+    15                              <1> ;
+    16                              <1> ;
+    17                              <1> ;-----------------------------------------------------------------------------
+    18                              <1> %ifndef MACRO_CPSUB64
+    19                              <1> %define MACRO_CPSUB64
+    20                              <1> 
+    21                              <1> %define STDIN  0
+    22                              <1> %define STDOUT 1
+    23                              <1> %define STDERR 2
+    24                              <1> 
+    25                              <1> %define TAB 09h
+    26                              <1> %define NL 0Ah
+    27                              <1> 
+    28                              <1> ; define the timespec structure used in nanosleep
+    29                              <1> struc timespec
+    30 00000000 ????????            <1>      tv_sec: resd 1
+    31 00000004 ????????            <1>      tv_nsec: resd 1
+    32                              <1> endstruc
+    33                              <1> 
+    34                              <1> 
+    35                              <1> ; Synonym for NASM invoke
+    36                              <1> %ifnmacro INVOKE
+    37                              <1> %macro INVOKE 1-*.nolist
+    38                              <1>      %rep %0 - 1
+    39                              <1>      %rotate -1
+    40                              <1>      push qword %1
+    41                              <1>      %endrep
+    42                              <1>      %rotate -1
+    43                              <1>      call %1
+    44                              <1>      add rsp, ( %0 - 1 ) * 8
+    45                              <1> %endmacro
+    46                              <1> %endif
+    47                              <1> 
+    48                              <1> 
+    49                              <1> %ifnmacro mWrite
+    50                              <1> ;------------------------------------------------------
+    51                              <1> %macro mWrite 1.nolist
+    52                              <1> ;
+    53                              <1> ; Writes a string literal to standard output.
+    54                              <1> ; Receives: a string enclosed in single or double 
+    55                              <1> ;   quotes (null terminator not required).
+    56                              <1> ;------------------------------------------------------
+    57                              <1> segment .data
+    58                              <1> 	%%string: db %1, 0
+    59                              <1> segment .text
+    60                              <1> 	push	rdx
+    61                              <1> 	mov	rdx,%%string
+    62                              <1>  	call	WriteString
+    63                              <1>  	pop	rdx
+    64                              <1> %endmacro
+    65                              <1> %endif
+    66                              <1> 
+    67                              <1> 
+    68                              <1> %ifnmacro mWriteSpace
+    69                              <1> ;------------------------------------------------------
+    70                              <1> %macro mWriteSpace 0-1.nolist 1
+    71                              <1> ;
+    72                              <1> ; Writes one or more spaces to standard output.
+    73                              <1> ; Receives: an integer specifying the number of spaces.
+    74                              <1> ;   If count is blank, a single space is written.
+    75                              <1> ;------------------------------------------------------
+    76                              <1> segment .data
+    77                              <1> %%spaces: times %1 db ' '
+    78                              <1> 	db 0
+    79                              <1> segment .text
+    80                              <1> 	push	rdx
+    81                              <1> 	mov	rdx, %%spaces
+    82                              <1> 	call	WriteString
+    83                              <1> 	pop	rdx
+    84                              <1> %endmacro
+    85                              <1> %endif
+    86                              <1> 
+    87                              <1> 
+    88                              <1> %ifnmacro mShowRegister
+    89                              <1> ;---------------------------------------------------
+    90                              <1> %macro mShowRegister 2.nolist
+    91                              <1> ;
+    92                              <1> ; Displays a 64-bit register name and its contents.
+    93                              <1> ; Receives: the register string name, the register.
+    94                              <1> ; Returns:  nothing
+    95                              <1> ;---------------------------------------------------
+    96                              <1> segment .data
+    97                              <1> %%tempStr: db "  ", %1,": ",0
+    98                              <1> 
+    99                              <1> segment .text
+   100                              <1> 	push	rax		; save reg	
+   101                              <1> 	push	rdx 		; save reg
+   102                              <1> 	mov	rdx, %%tempStr	; display the register name
+   103                              <1> 	call	WriteString
+   104                              <1> 	pop	rdx		; restore reg
+   105                              <1> 	mov	rax, %2		; display the reg contents in hex
+   106                              <1> 	call	WriteHex
+   107                              <1> 	pop	rax             ; restore reg
+   108                              <1> %endmacro
+   109                              <1> %endif
+   110                              <1> 
+   111                              <1> 
+   112                              <1> %ifnmacro ShowFlag
+   113                              <1> ;---------------------------------------------------------------------
+   114                              <1> %macro ShowFlag 2.nolist
+   115                              <1> ;
+   116                              <1> ; Helper macro.
+   117                              <1> ; Display a single CPU flag value
+   118                              <1> ; Directly accesses the eflags variable in Along32.asm
+   119                              <1> ; (This macro cannot be placed in Macros.inc)
+   120                              <1> ;---------------------------------------------------------------------
+   121                              <1> segment .data
+   122                              <1> %%flagStr: db "  ",%1, "="
+   123                              <1> %%flagVal: db 0,0
+   124                              <1> 
+   125                              <1> segment .text
+   126                              <1> 	push rax
+   127                              <1> 	push rdx
+   128                              <1> 	mov  rax, qword [eflags]	; retrieve the flags
+   129                              <1> 	mov  byte [%%flagVal],'1'
+   130                              <1> 	shr  rax, %2			; shift into carry flag
+   131                              <1> 	jc   %%L1
+   132                              <1> 	mov  byte [%%flagVal],'0'
+   133                              <1> %%L1:
+   134                              <1> 	mov  rdx, %%flagStr	; display flag name and value
+   135                              <1> 	call WriteString
+   136                              <1> 	pop  rdx
+   137                              <1> 	pop  rax
+   138                              <1> %endmacro
+   139                              <1> %endif
+   140                              <1> 
+   141                              <1> 
+   142                              <1> %ifnmacro ShowCC
+   143                              <1> ;---------------------------------------------------------------------
+   144                              <1> %macro ShowCC 2.nolist
+   145                              <1> ;
+   146                              <1> ; Helper macro.
+   147                              <1> ; Display a single Condition Code Eflag name and value
+   148                              <1> ; Directly accesses the eflags variable.
+   149                              <1> ; 
+   150                              <1> ;---------------------------------------------------------------------
+   151                              <1> segment .data
+   152                              <1> %%flagStr: db "  ",%1," : "    	; flag name plus = sign
+   153                              <1> %%flagVal: db 0,0         	; flag value if 0 or 1, plus NULL
+   154                              <1> 
+   155                              <1> segment .text
+   156                              <1> 	push rax  		; save reg
+   157                              <1> 	push rdx		; save reg
+   158                              <1> 	mov  rax, qword [eflags]	; retrieve the flags
+   159                              <1> 	mov  byte [%%flagVal],'1'	; ON
+   160                              <1> 	shr  rax, %2		; shift into carry flag
+   161                              <1> 	jc   %%L1
+   162                              <1> 	mov  byte [%%flagVal],'0'	; OFF
+   163                              <1> %%L1:
+   164                              <1> 	mov  rdx, %%flagStr	; display flag name and value
+   165                              <1> 	call WriteString
+   166                              <1> 	call Crlf		; line feed
+   167                              <1> 	pop  rdx		; restore reg
+   168                              <1> 	pop  rax		; restore reg
+   169                              <1> %endmacro
+   170                              <1> %endif
+   171                              <1> 
+   172                              <1> 
+   173                              <1> 
+   174                              <1> %ifnmacro CheckInit
+   175                              <1> ;-------------------------------------------------------------
+   176                              <1> %macro CheckInit 0.nolist
+   177                              <1> ;
+   178                              <1> ; Helper macro
+   179                              <1> ; Check to see if the console handles have been initialized
+   180                              <1> ; If not, initialize them now.
+   181                              <1> ;-------------------------------------------------------------
+   182                              <1> 	cmp byte [InitFlag],0
+   183                              <1> 	jne %%exit
+   184                              <1> 	mov byte [InitFlag],1
+   185                              <1> 	call BufferFlush
+   186                              <1> %%exit:
+   187                              <1> %endmacro
+   188                              <1> %endif
+   189                              <1> 
+   190                              <1> 
+   191                              <1> %ifnmacro SaveRegs
+   192                              <1> ;-------------------------------------------------------------
+   193                              <1> %macro SaveRegs 0.nolist
+   194                              <1> ;
+   195                              <1> ; Convenience macro
+   196                              <1> ; Save Registers
+   197                              <1> ; PUSH the 16 general purpose regs to the stack.
+   198                              <1> ;-------------------------------------------------------------
+   199                              <1>        push rax
+   200                              <1>        push rbx 
+   201                              <1>        push rcx
+   202                              <1>        push rdx
+   203                              <1>        push rsi
+   204                              <1>        push rdi
+   205                              <1>        push rbp
+   206                              <1>        push rsp
+   207                              <1>        push r8 	
+   208                              <1>        push r9  
+   209                              <1>        push r10
+   210                              <1>        push r11
+   211                              <1>        push r12
+   212                              <1>        push r13
+   213                              <1>        push r14
+   214                              <1>        push r15
+   215                              <1> %%exit:
+   216                              <1> %endmacro
+   217                              <1> %endif
+   218                              <1> 
+   219                              <1> %ifnmacro RestoreRegs
+   220                              <1> ;-------------------------------------------------------------
+   221                              <1> %macro RestoreRegs 0.nolist
+   222                              <1> ;
+   223                              <1> ; Convenience macro
+   224                              <1> ; Restore Registers
+   225                              <1> ; POP the 16 general purpose regs from the stack.
+   226                              <1> ;-------------------------------------------------------------
+   227                              <1> 	pop r15
+   228                              <1> 	pop r14
+   229                              <1> 	pop r13
+   230                              <1>      	pop r12
+   231                              <1> 	pop r11 
+   232                              <1> 	pop r10
+   233                              <1>      	pop r9 
+   234                              <1>      	pop r8 
+   235                              <1> 	pop rsp
+   236                              <1>       	pop rbp 
+   237                              <1>       	pop rdi
+   238                              <1>       	pop rsi
+   239                              <1>       	pop rdx
+   240                              <1>       	pop rcx 
+   241                              <1>       	pop rbx
+   242                              <1>       	pop rax
+   243                              <1> %%exit:
+   244                              <1> %endmacro
+   245                              <1> %endif
+   246                              <1> 
+   247                              <1> ; Termination Macro
+   248                              <1> ;-------------------------------------------------------------
+   249                              <1> ;
+   250                              <1> ; Convenience macro
+   251                              <1> ; Exit to operating system under Linux.
+   252                              <1> ;-------------------------------------------------------------
+   253                              <1> %ifnmacro Exit
+   254                              <1> %macro Exit 0.nolist  
+   255                              <1>      mov rax, 60
+   256                              <1>      xor rdi, rdi
+   257                              <1>      syscall
+   258                              <1> %%exit:
+   259                              <1> %endmacro
+   260                              <1> %endif
+   261                              <1> 
+   262                              <1> ; Termination Macro
+   263                              <1> %ifnmacro CPexit
+   264                              <1> ;-------------------------------------------------------------
+   265                              <1> ;
+   266                              <1> ; Convenience macro
+   267                              <1> ; Exit to operating system under Linux.
+   268                              <1> ;-------------------------------------------------------------
+   269                              <1> %macro CPexit 0-1.nolist  
+   270                              <1>      mov rax, 60
+   271                              <1>      xor rdi, rdi
+   272                              <1>      syscall
+   273                              <1> %%exit:
+   274                              <1> %endmacro
+   275                              <1> %endif
+   276                              <1> 
+   277                              <1> %endif  ;End of Macro Definitions
+    12                                  
+    13                                           section .data
+    14 00000000 456E642D6F662D5072-     eopmsg  db     	"End-of-Program",0h
+    14 00000009 6F6772616D00       
+    15 0000000F 456E74657220746865-     entermsg db    	"Enter the Subroutine........",0h
+    15 00000018 20537562726F757469-
+    15 00000021 6E652E2E2E2E2E2E2E-
+    15 0000002A 2E00               
+    16 0000002C 457869742020746865-     exitmsg db    	"Exit  the Subroutine........",0h
+    16 00000035 20537562726F757469-
+    16 0000003E 6E652E2E2E2E2E2E2E-
+    16 00000047 2E00               
+    17 00000049 54686520506172616D-     parm1msg db     "The Parameter (arg1) to be passed is: ",0
+    17 00000052 657465722028617267-
+    17 0000005B 312920746F20626520-
+    17 00000064 706173736564206973-
+    17 0000006D 3A2000             
+    18 00000070 8000000000000000        parm1   dq	128d
+    19 00000078 54686520506172616D-     parm2msg db     "The Parameter (arg2) to be passed is: ",0
+    19 00000081 657465722028617267-
+    19 0000008A 322920746F20626520-
+    19 00000093 706173736564206973-
+    19 0000009C 3A2000             
+    20 0000009F 0002000000000000        parm2   dq	512d
+    21 000000A7 54686520506172616D-     parm3msg db     "The Parameter (arg3) to be passed is: ",0
+    21 000000B0 657465722028617267-
+    21 000000B9 332920746F20626520-
+    21 000000C2 706173736564206973-
+    21 000000CB 3A2000             
+    22 000000CE 0004000000000000        parm3   dq	1024d
+    23 000000D6 52657475726E656420-     resultmsg db   	"Returned result to Caller: ",0
+    23 000000DF 726573756C7420746F-
+    23 000000E8 2043616C6C65723A20-
+    23 000000F1 00                 
+    24 000000F2 0000000000000000        result  dq	0h
+    25 000000FA 546865206669727374-     arg1msg db     	"The first Argument received by Subroutine is:  ",0
+    25 00000103 20417267756D656E74-
+    25 0000010C 207265636569766564-
+    25 00000115 20627920537562726F-
+    25 0000011E 7574696E652069733A-
+    25 00000127 202000             
+    26 0000012A 0000000000000000        arg1    dq	0h
+    27 00000132 546865207365636F6E-     arg2msg db     	"The second Argument received by Subroutine is: ",0
+    27 0000013B 6420417267756D656E-
+    27 00000144 742072656365697665-
+    27 0000014D 642062792053756272-
+    27 00000156 6F7574696E65206973-
+    27 0000015F 3A2000             
+    28 00000162 0000000000000000        arg2    dq	0h
+    29 0000016A 546865207468697264-     arg3msg db     	"The third Argument received by Subroutine is:  ",0
+    29 00000173 20417267756D656E74-
+    29 0000017C 207265636569766564-
+    29 00000185 20627920537562726F-
+    29 0000018E 7574696E652069733A-
+    29 00000197 202000             
+    30 0000019A 0000000000000000        arg3    dq	0h
+    31 000001A2 0000000000000000        sum	dq	0h
+    32                                   
+    33                                          global  main
+    34                                          section .text
+    35                                  main:
+    36 00000000 E8(00000000)            	call	Crlf
+    37 00000005 48BA-                           mov     rdx, parm1msg       	; write working on N message
+    37 00000007 [4900000000000000] 
+    38 0000000F E8(00000000)                    call    WriteString        	; 
+    39 00000014 488B0425[70000000]       	mov	rax, [parm1]        	; parameter 1
+    40 0000001C E8(00000000)            	call    WriteInt           	;
+    41 00000021 E8(00000000)            	call	Crlf			; 
+    42 00000026 48BA-                           mov     rdx, parm2msg       	; write working on N message
+    42 00000028 [7800000000000000] 
+    43 00000030 E8(00000000)                    call    WriteString        	; 
+    44 00000035 488B0425[9F000000]       	mov	rax, [parm2]        	; parameter 2
+    45 0000003D E8(00000000)            	call    WriteInt           	;
+    46 00000042 E8(00000000)            	call	Crlf			; 
+    47 00000047 48BA-                           mov     rdx, parm3msg       	; write working on N message
+    47 00000049 [A700000000000000] 
+    48 00000051 E8(00000000)                    call    WriteString        	; 
+    49 00000056 488B0425[CE000000]       	mov	rax, [parm3]        	; parameter 3
+    50 0000005E E8(00000000)            	call    WriteInt           	;
+    51 00000063 E8(00000000)            	call	Crlf
+    52 00000068 E8(00000000)            	call	Crlf		
+    53 0000006D 41B801000000            	mov	r8, 1			; load with value	
+    54 00000073 41B902000000            	mov	r9, 2			; load with value	
+    55 00000079 41BA03000000            	mov	r10, 3			; load with value
+    56                                  
+    57                                  ; Register contents to be preserved.
+    58 0000007F E8(00000000)            	call	Crlf
+    59 000001AA 202052383A20005052-     	mShowRegister "R8", r8
+    59 00000086 48BA-              
+    59 00000088 [AA01000000000000]-
+    59 00000090 E8(00000000)5A4C89-
+    59 00000098 C0E8(00000000)58   
+    60 000001B1 202052393A20005052-     	mShowRegister "R9", r9
+    60 000000A1 48BA-              
+    60 000000A3 [B101000000000000]-
+    60 000000AB E8(00000000)5A4C89-
+    60 000000B3 C8E8(00000000)58   
+    61 000001B8 20205231303A200050-     	mShowRegister "R10", r10
+    61 000000BB 5248BA-            
+    61 000000BE [B801000000000000]-
+    61 000000C6 E8(00000000)5A4C89-
+    61 000000CE D0E8(00000000)58   
+    62 000000D5 E8(00000000)            	call	Crlf
+    63 000000DA E8(00000000)            	call	Crlf
+    64                                  
+    65 000000DF 488B0425[70000000]      	mov	rax, [parm1]		;	
+    66 000000E7 488B1C25[9F000000]      	mov	rbx, [parm2]		;	
+    67 000000EF 488B0C25[CE000000]      	mov	rcx, [parm3]		;	
+    68                                  ; Note order of pushing on to stack.
+    69 000000F7 51                      	push	rcx			; pass third parm to subroutine
+    70 000000F8 53                      	push	rbx			; pass second parm to subroutine
+    71 000000F9 50                      	push	rax			; pass first parm to subroutine
+    72 000000FA E8(00000000)            	call	DumpRegs
+    73 000000FF E8B2000000              	call    mySubroutine1          	; call procedure
+    74 00000104 E8(00000000)            	call	DumpRegs
+    75 00000109 4883C418                	add	rsp, 3*8		; rid stack of 3 stack entries (3*8)
+    76                                  					; by incrementing the Stack Pointer
+    77                                  					; register by three 8-byte positions
+    78                                  
+    79                                  ; Show that caller register contents were in fact preserved
+    80 0000010D E8(00000000)            	call	Crlf
+    81 000001C0 202052383A20005052-     	mShowRegister "R8", r8
+    81 00000114 48BA-              
+    81 00000116 [C001000000000000]-
+    81 0000011E E8(00000000)5A4C89-
+    81 00000126 C0E8(00000000)58   
+    82 000001C7 202052393A20005052-     	mShowRegister "R9", r9
+    82 0000012F 48BA-              
+    82 00000131 [C701000000000000]-
+    82 00000139 E8(00000000)5A4C89-
+    82 00000141 C8E8(00000000)58   
+    83 000001CE 20205231303A200050-     	mShowRegister "R10", r10
+    83 00000149 5248BA-            
+    83 0000014C [CE01000000000000]-
+    83 00000154 E8(00000000)5A4C89-
+    83 0000015C D0E8(00000000)58   
+    84 00000163 E8(00000000)            	call	Crlf
+    85 00000168 E8(00000000)            	call	Crlf
+    86 0000016D 48890425[F2000000]              mov     [result], rax      	; save result
+    87 00000175 48BA-                   	mov	rdx, resultmsg     	; get address of output
+    87 00000177 [D600000000000000] 
+    88 0000017F E8(00000000)                    call    WriteString        	; call procedure
+    89 00000184 488B0425[F2000000]              mov     rax, [result]        	; get address of output
+    90 0000018C E8(00000000)                    call    WriteInt           	; call procedure
+    91 00000191 E8(00000000)                    call    Crlf               	;
+    92 00000196 EB00                    	jmp	myExit			; goto exit
+    93                                  
+    94                                  myExit:
+    95 00000198 48BA-                           mov     rdx, eopmsg        	; address message
+    95 0000019A [0000000000000000] 
+    96 000001A2 E8(00000000)                    call    WriteString        	; write end of program msg
+    97 000001A7 E8(00000000)            	call 	Crlf
+    98 000001AC B83C0000004831FF0F-             Exit    
+    98 000001B5 05                 
+    99                                  
+   100                                  
+   101                                  
+   102                                  ;----------------------------------------------------------------------
+   103                                  ; Subroutine1
+   104                                  ;
+   105                                  ; Function: Demonstrate use of Stack to access passed arguments,
+   106                                  ;	and protect the caller's register contents by saving as local
+   107                                  ;	variables on the program stack. 
+   108                                  ;
+   109                                  ; Receives: 3 arguments
+   110                                  ; 
+   111                                  ; Returns: RAX, the sum of the arguments as a result.
+   112                                  ;----------------------------------------------------------------------
+   113                                  mySubroutine1:
+   114                                  ; entry linkage	
+   115 000001B6 55                      	push	rbp			; save callers base pointer (RBP)
+   116 000001B7 4889E5                  	mov	rbp, rsp		; set new base pointer value
+   117 000001BA 4883EC08                 	sub	rsp, 1*8		; Stack Pointer set local var1 slot
+   118                                  
+   119 000001BE 48BA-                   	mov	rdx, entermsg		; Display ENTER SUBROUTINE msg
+   119 000001C0 [0F00000000000000] 
+   120 000001C8 E8(00000000)            	call	WriteString
+   121 000001CD E8(00000000)            	call	Crlf
+   122                                  
+   123                                  ; preserve the caller's register contents
+   124 000001D2 4150                    	push    r8			; save callers reg in local var
+   125 000001D4 4151                    	push    r9			; save callers reg in local var
+   126 000001D6 4152                    	push    r10			; save callers reg in local var
+   127                                  
+   128                                  ; display received arguments
+   129 000001D8 488B4510                 	mov     rax, [rbp + 2*8]   	; load with first parameter (arg1)
+   130 000001DC 48890425[2A010000]              mov     [arg1], rax      	; store received arg1
+   131 000001E4 48010425[A2010000]       	add	[sum], rax		; add 
+   132 000001EC 48BA-                    	mov	rdx, arg1msg     	; get address of output
+   132 000001EE [FA00000000000000] 
+   133 000001F6 E8(00000000)                    call    WriteString        	; call procedure
+   134 000001FB 488B0425[2A010000]              mov     rax, [arg1]        	; get address of output
+   135 00000203 E8(00000000)                    call    WriteInt           	; call procedure
+   136 00000208 E8(00000000)                    call    Crlf
+   137                                  
+   138 0000020D 488B4518                 	mov     rax, [rbp + 3*8]    	; load with second parameter (arg2)
+   139 00000211 48890425[62010000]              mov     [arg2], rax      	; store received arg2
+   140 00000219 48010425[A2010000]       	add	[sum], rax		; add 
+   141 00000221 48BA-                   	mov	rdx, arg2msg     	; get address of output
+   141 00000223 [3201000000000000] 
+   142 0000022B E8(00000000)                    call    WriteString        	; call procedure
+   143 00000230 488B0425[62010000]              mov     rax, [arg2]        	; get address of output
+   144 00000238 E8(00000000)                    call    WriteInt           	; call procedure
+   145 0000023D E8(00000000)            	call    Crlf               	;
+   146                                  
+   147 00000242 488B4520                 	mov     rax, [rbp + 4*8] 	; load with third parameter (arg3)
+   148 00000246 48890425[9A010000]              mov     [arg3], rax      	; store received arg3
+   149 0000024E 48010425[A2010000]       	add	[sum], rax		; add 
+   150 00000256 48BA-                   	mov	rdx, arg3msg     	; get address of output
+   150 00000258 [6A01000000000000] 
+   151 00000260 E8(00000000)                    call    WriteString        	; call procedure
+   152 00000265 488B0425[9A010000]              mov     rax, [arg3]        	; get address of output
+   153 0000026D E8(00000000)                    call    WriteInt           	; call procedure
+   154 00000272 E8(00000000)            	call    Crlf               	;
+   155 00000277 E8(00000000)            	call	Crlf
+   156                                  
+   157                                  ; prepare return value
+   158 0000027C 488B0425[A2010000]      	mov	rax, [sum]		; load reg with sum
+   159                                  
+   160                                  ; introduce change to register values used by caller
+   161 00000284 4D31C0                  	xor	r8, r8			; set to zero	
+   162 00000287 4D31C9                  	xor	r9, r9			; set to zero	
+   163 0000028A 4D31D2                  	xor	r10, r10		; set to zero	
+   164 0000028D E8(00000000)            	call	DumpRegs
+   165                                  
+   166                                  ; recover callers register contents used by subroutine, note reverse order
+   167 00000292 415A                            pop     r10                     ; restore callers reg contents
+   168 00000294 4159                            pop     r9                      ; restore callers reg contents
+   169 00000296 4158                            pop     r8                      ; restore callers reg contents
+   170                                  	
+   171 00000298 48BA-                   	mov	rdx, exitmsg		
+   171 0000029A [2C00000000000000] 
+   172 000002A2 E8(00000000)            	call	WriteString		; Display EXIT SUBROUTINE msg
+   173 000002A7 E8(00000000)            	call	Crlf
+   174                                  
+   175                                  ; return linkage
+   176 000002AC 4889EC                  	mov	rsp, rbp		; restore callers stack pointer (RSP)
+   177 000002AF 5D                      	pop	rbp			; restore callers base pointer (RBP)
+   178 000002B0 C3                              ret                             ; return, rax contains result
