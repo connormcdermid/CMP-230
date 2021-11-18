@@ -8,6 +8,7 @@ global	main	; global entry point export for ld
 
 section .data
 eopmsg	db	"Program terminating.",00h
+negmsg	db	"The number must be positive.",00h	; remember null terminators
 prompt	db	"Please enter the quantity of fibonacci numbers you'd like: ",00h
 ipbuf	times	255 db	20h 	; define buffer of whitespace
 ipbufln	equ	$-ipbuf
@@ -83,9 +84,10 @@ loopnt	equ	$
 	call	ReadString	; perform keyboard read
 	mov	rdx, ipbuf	; address numeral input area
 	mov	rcx, rax	; numeral count
-	call	ParseInteger64	; parse signed binary from input
-	jc	invalid
-	; result already stored in RAX as return from ParseInteger64()
+	call	ParseInteger64	; parse signed binary from input, returned in RAX
+	cmp	rax, 0
+	je	invalid
+	jl	negnum	; causes infinite loop
 	mov	r8, rax	; preserve original user input
 	; indenting for ease of reading
 	mov	r15, 1	; loop iterator variable
@@ -104,6 +106,12 @@ loopnt	equ	$
 
 invalid	equ	$
 	mov	rdx, invmsg	; write invalid message
+	call	WriteString
+	call	Crlf
+	jmp	loopnt		; loop back to beginning of subroutine
+
+negnum	equ	$
+	mov	rdx, negmsg	; write negative numbers message
 	call	WriteString
 	call	Crlf
 	jmp	loopnt		; loop back to beginning of subroutine
