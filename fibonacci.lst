@@ -417,29 +417,38 @@
     84 00000082 [5100000000000000] 
     85 0000008A 4889C1                  	mov	rcx, rax	; numeral count
     86 0000008D E8(00000000)            	call	ParseInteger64	; parse signed binary from input
-    87 00000092 7211                    	jc	invalid
+    87 00000092 7228                    	jc	invalid
     88                                  	; result already stored in RAX as return from ParseInteger64()
-    89 00000094 50                      	push	rax	; fib(RAX)
-    90 00000095 E866FFFFFF              	call	fib
-    91 0000009A 4883C408                	add	rsp, 8*1; clear RAX from stack
-    92                                  	; whaddaya know, fib() also returns RAX
-    93 0000009E E8(00000000)            	call	WriteInt
-    94 000000A3 EB16                    	jmp	term
-    95                                  
-    96                                  invalid	equ	$
-    97 000000A5 48BA-                   	mov	rdx, invmsg	; write invalid message
-    97 000000A7 [5001000000000000] 
-    98 000000AF E8(00000000)            	call	WriteString
-    99 000000B4 E8(00000000)            	call	Crlf
-   100 000000B9 EB98                    	jmp	loopnt		; loop back to beginning of subroutine
-   101                                  
-   102                                  term	equ	$
-   103 000000BB 48BA-                   	mov	rdx, eopmsg	; address message
-   103 000000BD [0000000000000000] 
-   104 000000C5 E8(00000000)            	call	WriteString
-   105 000000CA E8(00000000)            	call	Crlf
-   106 000000CF B83C0000004831FF0F-     	Exit
-   106 000000D8 05                 
-   107                                  
-   108                                  
-   109                                  
+    89 00000094 4989C0                  	mov	r8, rax	; preserve original user input
+    90                                  	; indenting for ease of reading
+    91 00000097 41BF01000000            	mov	r15, 1	; loop iterator variable
+    92                                  	fibloop	equ	$
+    93                                  		
+    94 0000009D 4157                    		push	r15	; fib(R15)
+    95 0000009F E85CFFFFFF              		call	fib
+    96 000000A4 4883C408                		add	rsp, 8*1; clear R15 from stack
+    97                                  		; whaddaya know, fib() also returns RAX
+    98 000000A8 E8(00000000)            		call	WriteInt	; print fib(n)
+    99 000000AD E8(00000000)            		call	Crlf
+   100 000000B2 4D39C7                  		cmp	r15, r8		; compare user input w/ loop iterator
+   101 000000B5 741B                    		je	term		; if equal, leave loop
+   102 000000B7 49FFC7                  		inc	r15		; else, increment iterator + continue
+   103 000000BA EBE1                    		jmp	fibloop		; loop again
+   104                                  
+   105                                  invalid	equ	$
+   106 000000BC 48BA-                   	mov	rdx, invmsg	; write invalid message
+   106 000000BE [5001000000000000] 
+   107 000000C6 E8(00000000)            	call	WriteString
+   108 000000CB E8(00000000)            	call	Crlf
+   109 000000D0 EB81                    	jmp	loopnt		; loop back to beginning of subroutine
+   110                                  
+   111                                  term	equ	$
+   112 000000D2 48BA-                   	mov	rdx, eopmsg	; address message
+   112 000000D4 [0000000000000000] 
+   113 000000DC E8(00000000)            	call	WriteString
+   114 000000E1 E8(00000000)            	call	Crlf
+   115 000000E6 B83C0000004831FF0F-     	Exit
+   115 000000EF 05                 
+   116                                  
+   117                                  
+   118                                  

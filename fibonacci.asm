@@ -86,12 +86,21 @@ loopnt	equ	$
 	call	ParseInteger64	; parse signed binary from input
 	jc	invalid
 	; result already stored in RAX as return from ParseInteger64()
-	push	rax	; fib(RAX)
-	call	fib
-	add	rsp, 8*1; clear RAX from stack
-	; whaddaya know, fib() also returns RAX
-	call	WriteInt
-	jmp	term
+	mov	r8, rax	; preserve original user input
+	; indenting for ease of reading
+	mov	r15, 1	; loop iterator variable
+	fibloop	equ	$
+		
+		push	r15	; fib(R15)
+		call	fib
+		add	rsp, 8*1; clear R15 from stack
+		; whaddaya know, fib() also returns RAX
+		call	WriteInt	; print fib(n)
+		call	Crlf
+		cmp	r15, r8		; compare user input w/ loop iterator
+		je	term		; if equal, leave loop
+		inc	r15		; else, increment iterator + continue
+		jmp	fibloop		; loop again
 
 invalid	equ	$
 	mov	rdx, invmsg	; write invalid message
