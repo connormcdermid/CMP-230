@@ -16,6 +16,87 @@ invmsg	db	"Integer is not valid. Please try again."
 
 section .text
 
+;------------------------------------------------------
+; SUBROUTINE: fpcvt
+; INPUTS: One IEEE-754 encoded floating point number
+; OUTPUTS: One string-encoded decimal floating point number
+; A probably fairly complicated bit hack to manually convert since I can't find any
+; instructions or libraries to do it for me.
+fpcvt:
+	; subroutine prologue
+	push	rbp	; save caller base pointer
+	mov	rbp, rsp; new base pointer
+	sub	rsp, 1*8; allocate x local vars if needed
+	push	rax
+	push	rbx	; save working regs
+
+	; subroutine body
+	; fetch parameter into RAX
+	mov	rax, [rbp + 2*8]
+	; while technically signed, our float will *always* be positive, so
+	; I don't care about the sign bit
+	; next, parse exponent
+	; make bitmask for only the first 12 bits minus the sign bit -- 
+	; 01111111 11110000 00000000 00000000 00000000 00000000 00000000 00000000
+	mov	[rbp + 8], rax	; save rax as local var
+	and	rax, 0xFFF0000000000000
+	shr	rax, 13	; bitshift 13 to the right
+	sub	rax, 1023 ; unbias exponent (double exponent bias is 1023)
+	; exponent now in RAX
+	mov	rbx, [rbp + 8] ; copy original from local var into RBX
+	; bitmask for final 52 bits
+	; 0x000FFFFFFFFFFFFF
+	and	rbx, 0x000FFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
+	
+
+	; subroutine epilogue
+	pop rbx
+	pop rax
+	add	rsp, 1*8; deallocate x local vars
+	mov	rsp, rbp
+	pop	rbp
+	ret
+;
+;-------------------------------------------------------
+
+;-------------------------------------------------------
+; SUBROUTINE: phi
+; INPUTS: two integers fib(n-1) and fib(n)
+; OUTPUTS: approximation of phi in RAX
+; Uses SSE registers because I can't be bothered to bit-hack my way to infinitely more accurate values of phi
+; On x86-64 Unix *all* SSE registers are scratch registers -- I have no responsibility to save any of them.
+phi:
+	; subroutine prologue
+	push	rbp	; save caller base pointer
+	mov	rbp, rsp; new base pointer
+	;sub	rsp, x*8; allocate x local vars if needed
+	push	rax
+	push	rbx
+
+	; subroutine body
+	mov	rax, [rbp + 2*8]; retrieve param 1 (fib(n-1))
+	mov	rbx, [rbp + 3*8]; retrieve param 2 (fib(n))
+	; convert integers to double-precision floats
+	cvtsi2sd	rax, xmm0; cvtsi2sd = convert signed integer to signed double
+	cvtsi2sd	rbx, xmm1
+	; now divide them
+	divsd	xmm0, xmm1 ; divide signed double
+	; result now stored as double-precision floating point in xmm0
+	; now move it to a general-purpose register so it can be used by the rest of the program
+	; *without* clobbering the floating-pointedness
+	movq	rax, xmm0	; move quadword
+	; done
+
+	; subroutine epilogue
+	pop	rbx
+	pop	rax
+	;add	rsp, x*8; deallocate local vars
+	mov	rsp, rbp
+	pop	rbp
+	ret
+
+;--------------------------------------------------------
+
 ;--------------------------------------------------------
 ; SUBROUTINE: fib
 ; INPUTS: Quantity
@@ -24,7 +105,7 @@ fib:
 	; subroutine prologue
 	push	rbp	; save caller base pointer
 	mov	rbp, rsp; new base pointer
-	sub	rsp, 3*8; allocate 2 local vars on stack
+	sub	rsp, 3*8; allocate 3 local vars on stack
 	push	rbx	; save caller regs
 	push	rcx	; for use as working regs
 	
@@ -85,7 +166,7 @@ loopnt	equ	$
 	mov	rdx, ipbuf	; address numeral input area
 	mov	rcx, rax	; numeral count
 	call	ParseInteger64	; parse signed binary from input, returned in RAX
-	cmp	rax, 0
+	cmp	rax, 0 ; return of 0 from RAX indicates invalid input
 	je	invalid
 	jl	negnum	; causes infinite loop
 	mov	r8, rax	; preserve original user input
