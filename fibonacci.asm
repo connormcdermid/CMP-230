@@ -26,33 +26,37 @@ fpcvt:
 	; subroutine prologue
 	push	rbp	; save caller base pointer
 	mov	rbp, rsp; new base pointer
-	sub	rsp, 1*8; allocate x local vars if needed
+	sub	rsp, 2*8; allocate x local vars if needed
 	push	rax
 	push	rbx	; save working regs
 
 	; subroutine body
-	; fetch parameter into RAX
-	mov	rax, [rbp + 2*8]
+	; fetch parameter into xmm0
+	movdqu	xmm0, [rbp + 8]
 	; while technically signed, our float will *always* be positive, so
 	; I don't care about the sign bit
 	; next, parse exponent
-	; make bitmask for only the first 12 bits minus the sign bit -- 
-	; 01111111 11110000 00000000 00000000 00000000 00000000 00000000 00000000
-	mov	[rbp + 8], rax	; save rax as local var
-	and	rax, 0xFFF0000000000000
+	; make bitmask for only the first 16 bits minus the sign bit -- 
+	; 0x7FFF0000000000000000000000000000
+	mov	[rbp - 8], rax	; save rax as local var
+	and	rax, 0x7FFF << 28
 	shr	rax, 13	; bitshift 13 to the right
 	sub	rax, 1023 ; unbias exponent (double exponent bias is 1023)
 	; exponent now in RAX
-	mov	rbx, [rbp + 8] ; copy original from local var into RBX
+	mov	rbx, [rbp - 8] ; copy original from local var into RBX
 	; bitmask for final 52 bits
 	; 0x000FFFFFFFFFFFFF
-	and	rbx, 0x000FFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
-	
+	and	rbx, 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
+	; no bitshift needed	
+	; need a test of the endianness of the mantissa
+	mov	[rbp - 16], rax	; second local variable now contains exponent
+	mov	rax, rbx
+	call	WriteInt
 
 	; subroutine epilogue
 	pop rbx
 	pop rax
-	add	rsp, 1*8; deallocate x local vars
+	add	rsp, 2*8; deallocate x local vars
 	mov	rsp, rbp
 	pop	rbp
 	ret
@@ -62,7 +66,7 @@ fpcvt:
 ;-------------------------------------------------------
 ; SUBROUTINE: phi
 ; INPUTS: two integers fib(n-1) and fib(n)
-; OUTPUTS: approximation of phi in RAX
+; OUTPUTS: approximation of phi in XMM0
 ; Uses SSE registers because I can't be bothered to bit-hack my way to infinitely more accurate values of phi
 ; On x86-64 Unix *all* SSE registers are scratch registers -- I have no responsibility to save any of them.
 phi:
@@ -77,14 +81,14 @@ phi:
 	mov	rax, [rbp + 2*8]; retrieve param 1 (fib(n-1))
 	mov	rbx, [rbp + 3*8]; retrieve param 2 (fib(n))
 	; convert integers to double-precision floats
-	cvtsi2sd	rax, xmm0; cvtsi2sd = convert signed integer to signed double
-	cvtsi2sd	rbx, xmm1
+	cvtsi2sd xmm0, rax; cvtsi2sd = convert signed integer to signed double
+	cvtsi2sd xmm1, rbx
 	; now divide them
 	divsd	xmm0, xmm1 ; divide signed double
 	; result now stored as double-precision floating point in xmm0
 	; now move it to a general-purpose register so it can be used by the rest of the program
 	; *without* clobbering the floating-pointedness
-	movq	rax, xmm0	; move quadword
+	;movq	rcx, xmm0	; move quadword
 	; done
 
 	; subroutine epilogue
@@ -181,9 +185,31 @@ loopnt	equ	$
 		call	WriteInt	; print fib(n)
 		call	Crlf
 		cmp	r15, r8		; compare user input w/ loop iterator
-		je	term		; if equal, leave loop
+		je	goldrat		; if equal, leave loop
 		inc	r15		; else, increment iterator + continue
 		jmp	fibloop		; loop again
+	; once more for golden ratio
+goldrat	equ	$
+	push	r8
+	call	fib
+	add	rsp, 8*1; clear r8 from stack
+	mov	rbx, rax
+	push	r8
+	call	fib
+	add	rsp, 8*1
+	push	rax
+	push 	rbx
+	call	phi
+	add	rsp, 8*2
+	; OK, for this I need to push an SSE register onto the stack
+	; It is twice the size of a normal register
+	; as such I cannot use push and pop
+	; I need to do it manually
+	sub	rsp, 8*2; subtract 16 bytes or 128 bits
+	movdqu	dqword [rsp], xmm0
+	call	fpcvt	; call floating point converter
+	; pop xmm0
+	add	rsp, 8*2
 
 invalid	equ	$
 	mov	rdx, invmsg	; write invalid message
