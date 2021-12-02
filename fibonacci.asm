@@ -39,18 +39,19 @@ fpcvt:
 	; make bitmask for only the first 16 bits minus the sign bit -- 
 	; 0x7FFF0000000000000000000000000000
 	mov	[rbp - 8], rax	; save rax as local var
-	and	rax, 0x7FFF << 28
-	shr	rax, 13	; bitshift 13 to the right
+	andpd	xmm0, 0x7FFF0000000000000000000000000000
+	shr	xmm0, 28	; bitshift 28 to the right
+	movq	rax, xmm0
 	sub	rax, 1023 ; unbias exponent (double exponent bias is 1023)
 	; exponent now in RAX
 	mov	rbx, [rbp - 8] ; copy original from local var into RBX
 	; bitmask for final 52 bits
 	; 0x000FFFFFFFFFFFFF
-	and	rbx, 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
+	andpd	xmm0, 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
 	; no bitshift needed	
 	; need a test of the endianness of the mantissa
 	mov	[rbp - 16], rax	; second local variable now contains exponent
-	mov	rax, rbx
+	movq	rax, xmm0
 	call	WriteInt
 
 	; subroutine epilogue
@@ -206,7 +207,7 @@ goldrat	equ	$
 	; as such I cannot use push and pop
 	; I need to do it manually
 	sub	rsp, 8*2; subtract 16 bytes or 128 bits
-	movdqu	dqword [rsp], xmm0
+	movdqu	[rsp], xmm0
 	call	fpcvt	; call floating point converter
 	; pop xmm0
 	add	rsp, 8*2
