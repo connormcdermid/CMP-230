@@ -364,216 +364,207 @@
     31 00000009 53                      	push	rbx	; save working regs
     32                                  
     33                                  	; subroutine body
-    34                                  	; fetch parameter into xmm0
-    35 0000000A F30F6F4508              	movdqu	xmm0, [rbp + 8]
+    34                                  	; fetch parameter into RAX
+    35 0000000A 488B4510                	mov	rax, [rbp + 2*8]
     36                                  	; while technically signed, our float will *always* be positive, so
     37                                  	; I don't care about the sign bit
     38                                  	; next, parse exponent
-    39                                  	; make bitmask for only the first 16 bits minus the sign bit -- 
-    40                                  	; 0x7FFF0000000000000000000000000000
-    41 0000000F 488945F8                	mov	[rbp - 8], rax	; save rax as local var
-    42                                  	andpd	xmm0, 0x7FFF0000000000000000000000000000
-    42          ******************       warning: numeric constant 0x7FFF0000000000000000000000000000 does not fit in 64 bits [-w+number-overflow]
-    42          ******************       error: invalid combination of opcode and operands
-    43                                  	shr	xmm0, 28	; bitshift 28 to the right
-    43          ******************       error: invalid combination of opcode and operands
-    44 00000013 66480F7EC0              	movq	rax, xmm0
-    45 00000018 482DFF030000            	sub	rax, 1023 ; unbias exponent (double exponent bias is 1023)
-    46                                  	; exponent now in RAX
-    47 0000001E 488B5DF8                	mov	rbx, [rbp - 8] ; copy original from local var into RBX
-    48                                  	; bitmask for final 52 bits
-    49                                  	; 0x000FFFFFFFFFFFFF
-    50                                  	andpd	xmm0, 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
-    50          ******************       warning: numeric constant 0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFF does not fit in 64 bits [-w+number-overflow]
-    50          ******************       error: invalid combination of opcode and operands
-    51                                  	; no bitshift needed	
-    52                                  	; need a test of the endianness of the mantissa
-    53 00000022 488945F0                	mov	[rbp - 16], rax	; second local variable now contains exponent
-    54 00000026 66480F7EC0              	movq	rax, xmm0
-    55 0000002B E8(00000000)            	call	WriteInt
-    56                                  
-    57                                  	; subroutine epilogue
-    58 00000030 5B                      	pop rbx
-    59 00000031 58                      	pop rax
-    60 00000032 4883C410                	add	rsp, 2*8; deallocate x local vars
-    61 00000036 4889EC                  	mov	rsp, rbp
-    62 00000039 5D                      	pop	rbp
-    63 0000003A C3                      	ret
-    64                                  ;
-    65                                  ;-------------------------------------------------------
-    66                                  
-    67                                  ;-------------------------------------------------------
-    68                                  ; SUBROUTINE: phi
-    69                                  ; INPUTS: two integers fib(n-1) and fib(n)
-    70                                  ; OUTPUTS: approximation of phi in XMM0
-    71                                  ; Uses SSE registers because I can't be bothered to bit-hack my way to infinitely more accurate values of phi
-    72                                  ; On x86-64 Unix *all* SSE registers are scratch registers -- I have no responsibility to save any of them.
-    73                                  phi:
-    74                                  	; subroutine prologue
-    75 0000003B 55                      	push	rbp	; save caller base pointer
-    76 0000003C 4889E5                  	mov	rbp, rsp; new base pointer
-    77                                  	;sub	rsp, x*8; allocate x local vars if needed
-    78 0000003F 50                      	push	rax
-    79 00000040 53                      	push	rbx
-    80                                  
-    81                                  	; subroutine body
-    82 00000041 488B4510                	mov	rax, [rbp + 2*8]; retrieve param 1 (fib(n-1))
-    83 00000045 488B5D18                	mov	rbx, [rbp + 3*8]; retrieve param 2 (fib(n))
-    84                                  	; convert integers to double-precision floats
-    85 00000049 F2480F2AC0              	cvtsi2sd xmm0, rax; cvtsi2sd = convert signed integer to signed double
-    86 0000004E F2480F2ACB              	cvtsi2sd xmm1, rbx
-    87                                  	; now divide them
-    88 00000053 F20F5EC1                	divsd	xmm0, xmm1 ; divide signed double
-    89                                  	; result now stored as double-precision floating point in xmm0
-    90                                  	; now move it to a general-purpose register so it can be used by the rest of the program
-    91                                  	; *without* clobbering the floating-pointedness
-    92                                  	;movq	rcx, xmm0	; move quadword
-    93                                  	; done
-    94                                  
-    95                                  	; subroutine epilogue
-    96 00000057 5B                      	pop	rbx
-    97 00000058 58                      	pop	rax
-    98                                  	;add	rsp, x*8; deallocate local vars
-    99 00000059 4889EC                  	mov	rsp, rbp
-   100 0000005C 5D                      	pop	rbp
-   101 0000005D C3                      	ret
-   102                                  
-   103                                  ;--------------------------------------------------------
-   104                                  
-   105                                  ;--------------------------------------------------------
-   106                                  ; SUBROUTINE: fib
-   107                                  ; INPUTS: Quantity
-   108                                  ; OUTPUTS: Requested numbers in RAX
-   109                                  fib:
-   110                                  	; subroutine prologue
-   111 0000005E 55                      	push	rbp	; save caller base pointer
-   112 0000005F 4889E5                  	mov	rbp, rsp; new base pointer
-   113 00000062 4883EC18                	sub	rsp, 3*8; allocate 3 local vars on stack
-   114 00000066 53                      	push	rbx	; save caller regs
-   115 00000067 51                      	push	rcx	; for use as working regs
-   116                                  	
-   117                                  	; subroutine body
-   118 00000068 488B4510                	mov	rax, [rbp + 2*8]; retrieve parameter
-   119 0000006C 4883F801                	cmp	rax, 1		; if n = 1
-   120 00000070 7E34                    	jle	return		; return from subroutine
-   121                                  				; else, continue
-   122 00000072 BB01000000              	mov	rbx, 1
-   123 00000077 B902000000              	mov	rcx, 2
-   124 0000007C 50                      	push 	rax	; preserve original value of RAX
-   125 0000007D 4829D8                  	sub	rax, rbx	; n - 1
-   126 00000080 4889C3                  	mov	rbx, rax	; rbx should hold n - 1 value
-   127 00000083 58                      	pop	rax		; restore value of RAX
-   128 00000084 4829C8                  	sub	rax, rcx	; n - 2
-   129 00000087 4889C1                  	mov	rcx, rax	; rcx should hold n - 2 value
-   130 0000008A 53                      	push	rbx		; pass n - 1 to fib()
-   131 0000008B E8CEFFFFFF              	call	fib
-   132 00000090 5B                      	pop	rbx
-   133 00000091 4889C3                  	mov	rbx, rax	; fib(n - 1) now in RBX
-   134 00000094 51                      	push	rcx		; pass n - 2 to fib()
-   135 00000095 E8C4FFFFFF              	call	fib
-   136 0000009A 59                      	pop 	rcx
-   137 0000009B 4889C1                  	mov	rcx, rax	; fib(n - 2) now in RCX
-   138                                  				; yeah, yeah, I could just use RAX, but this is more readable
-   139                                  	
-   140 0000009E 4801CB                  	add	rbx, rcx	; fib(n - 1) + fib(n - 2)
-   141 000000A1 4889D8                  	mov	rax, rbx	; move result of fib function to RAX for return
-   142 000000A4 EB00                    	jmp	return
-   143                                  	
-   144                                  return	equ	$
-   145                                  	; subroutine epilogue
-   146 000000A6 59                      	pop	rcx		; restore caller regs
-   147 000000A7 5B                      	pop	rbx	
-   148 000000A8 4883C418                	add	rsp, 3*8	; clear stack of local var allocations
-   149 000000AC 4889EC                  	mov	rsp, rbp	; restore caller stack pointer
-   150 000000AF 5D                      	pop	rbp	; restore caller base pointer
-   151 000000B0 C3                      	ret	; return from subroutine with result in RAX
+    39                                  	; make bitmask for only the first 12 bits minus the sign bit -- 
+    40                                  	; 01111111 11110000 00000000 00000000 00000000 00000000 00000000 00000000
+    41 0000000E 48894508                	mov	[rbp + 8], rax	; save rax as local var
+    42 00000012 4883E000                	and	rax, 0x7FF0000000000000
+    42          ******************       warning: signed dword value exceeds bounds [-w+number-overflow]
+    43 00000016 48C1E80D                	shr	rax, 13	; bitshift 13 to the right
+    44 0000001A 482DFF030000            	sub	rax, 1023 ; unbias exponent (double exponent bias is 1023)
+    45                                  	; exponent now in RAX
+    46 00000020 488B5DF8                	mov	rbx, [rbp - 8] ; copy original from local var into RBX
+    47                                  	; bitmask for final 52 bits
+    48                                  	; 0x000FFFFFFFFFFFFF
+    49 00000024 4883E3FF                	and	rbx, 0x000FFFFFFFFFFFFF; rbx now contains mantissa or fractional significand
+    49          ******************       warning: signed dword value exceeds bounds [-w+number-overflow]
+    50                                  	; no bitshift needed	
+    51                                  	; need a test of the endianness of the mantissa
+    52 00000028 488945F0                	mov	[rbp - 16], rax	; second local variable now contains exponent
+    53 0000002C 4889D8                  	mov	rax, rbx
+    54 0000002F E8(00000000)            	call	WriteInt
+    55                                  
+    56                                  	; subroutine epilogue
+    57 00000034 5B                      	pop rbx
+    58 00000035 58                      	pop rax
+    59 00000036 4883C410                	add	rsp, 2*8; deallocate x local vars
+    60 0000003A 4889EC                  	mov	rsp, rbp
+    61 0000003D 5D                      	pop	rbp
+    62 0000003E C3                      	ret
+    63                                  ;
+    64                                  ;-------------------------------------------------------
+    65                                  
+    66                                  ;-------------------------------------------------------
+    67                                  ; SUBROUTINE: phi
+    68                                  ; INPUTS: two integers fib(n-1) and fib(n)
+    69                                  ; OUTPUTS: approximation of phi in RCX
+    70                                  ; Uses SSE registers because I can't be bothered to bit-hack my way to infinitely more accurate values of phi
+    71                                  ; On x86-64 Unix *all* SSE registers are scratch registers -- I have no responsibility to save any of them.
+    72                                  phi:
+    73                                  	; subroutine prologue
+    74 0000003F 55                      	push	rbp	; save caller base pointer
+    75 00000040 4889E5                  	mov	rbp, rsp; new base pointer
+    76                                  	;sub	rsp, x*8; allocate x local vars if needed
+    77 00000043 50                      	push	rax
+    78 00000044 53                      	push	rbx
+    79                                  
+    80                                  	; subroutine body
+    81 00000045 488B4510                	mov	rax, [rbp + 2*8]; retrieve param 1 (fib(n-1))
+    82 00000049 488B5D18                	mov	rbx, [rbp + 3*8]; retrieve param 2 (fib(n))
+    83                                  	; convert integers to double-precision floats
+    84 0000004D F2480F2AC0              	cvtsi2sd xmm0, rax; cvtsi2sd = convert signed integer to signed double
+    85 00000052 F2480F2ACB              	cvtsi2sd xmm1, rbx
+    86                                  	; now divide them
+    87 00000057 F20F5EC1                	divsd	xmm0, xmm1 ; divide signed double
+    88                                  	; result now stored as double-precision floating point in xmm0
+    89                                  	; now move it to a general-purpose register so it can be used by the rest of the program
+    90                                  	; *without* clobbering the floating-pointedness
+    91 0000005B 66480F7EC1              	movq	rcx, xmm0	; move quadword
+    92                                  	; done
+    93                                  
+    94                                  	; subroutine epilogue
+    95 00000060 5B                      	pop	rbx
+    96 00000061 58                      	pop	rax
+    97                                  	;add	rsp, x*8; deallocate local vars
+    98 00000062 4889EC                  	mov	rsp, rbp
+    99 00000065 5D                      	pop	rbp
+   100 00000066 C3                      	ret
+   101                                  
+   102                                  ;--------------------------------------------------------
+   103                                  
+   104                                  ;--------------------------------------------------------
+   105                                  ; SUBROUTINE: fib
+   106                                  ; INPUTS: Quantity
+   107                                  ; OUTPUTS: Requested numbers in RAX
+   108                                  fib:
+   109                                  	; subroutine prologue
+   110 00000067 55                      	push	rbp	; save caller base pointer
+   111 00000068 4889E5                  	mov	rbp, rsp; new base pointer
+   112 0000006B 4883EC18                	sub	rsp, 3*8; allocate 3 local vars on stack
+   113 0000006F 53                      	push	rbx	; save caller regs
+   114 00000070 51                      	push	rcx	; for use as working regs
+   115                                  	
+   116                                  	; subroutine body
+   117 00000071 488B4510                	mov	rax, [rbp + 2*8]; retrieve parameter
+   118 00000075 4883F801                	cmp	rax, 1		; if n = 1
+   119 00000079 7E34                    	jle	return		; return from subroutine
+   120                                  				; else, continue
+   121 0000007B BB01000000              	mov	rbx, 1
+   122 00000080 B902000000              	mov	rcx, 2
+   123 00000085 50                      	push 	rax	; preserve original value of RAX
+   124 00000086 4829D8                  	sub	rax, rbx	; n - 1
+   125 00000089 4889C3                  	mov	rbx, rax	; rbx should hold n - 1 value
+   126 0000008C 58                      	pop	rax		; restore value of RAX
+   127 0000008D 4829C8                  	sub	rax, rcx	; n - 2
+   128 00000090 4889C1                  	mov	rcx, rax	; rcx should hold n - 2 value
+   129 00000093 53                      	push	rbx		; pass n - 1 to fib()
+   130 00000094 E8CEFFFFFF              	call	fib
+   131 00000099 5B                      	pop	rbx
+   132 0000009A 4889C3                  	mov	rbx, rax	; fib(n - 1) now in RBX
+   133 0000009D 51                      	push	rcx		; pass n - 2 to fib()
+   134 0000009E E8C4FFFFFF              	call	fib
+   135 000000A3 59                      	pop 	rcx
+   136 000000A4 4889C1                  	mov	rcx, rax	; fib(n - 2) now in RCX
+   137                                  				; yeah, yeah, I could just use RAX, but this is more readable
+   138                                  	
+   139 000000A7 4801CB                  	add	rbx, rcx	; fib(n - 1) + fib(n - 2)
+   140 000000AA 4889D8                  	mov	rax, rbx	; move result of fib function to RAX for return
+   141 000000AD EB00                    	jmp	return
+   142                                  	
+   143                                  return	equ	$
+   144                                  	; subroutine epilogue
+   145 000000AF 59                      	pop	rcx		; restore caller regs
+   146 000000B0 5B                      	pop	rbx	
+   147 000000B1 4883C418                	add	rsp, 3*8	; clear stack of local var allocations
+   148 000000B5 4889EC                  	mov	rsp, rbp	; restore caller stack pointer
+   149 000000B8 5D                      	pop	rbp	; restore caller base pointer
+   150 000000B9 C3                      	ret	; return from subroutine with result in RAX
+   151                                  	
    152                                  	
    153                                  	
-   154                                  	
-   155                                  ; END SUBROUTINE: fib
-   156                                  ;--------------------------------------------------------
-   157                                  
-   158                                  main:
-   159                                  
-   160                                  ; keep looping until user quits
-   161                                  loopnt	equ	$
-   162 000000B1 E8(00000000)            	call	Crlf
-   163                                  
-   164 000000B6 48BA-                   	mov	rdx, prompt	; write user prompt
-   164 000000B8 [3200000000000000] 
-   165 000000C0 E8(00000000)            	call	WriteString
-   166 000000C5 E8(00000000)            	call	Crlf
-   167                                  
-   168 000000CA 48BA-                   	mov	rdx, ipbuf	; address data buffer
-   168 000000CC [6E00000000000000] 
-   169 000000D4 B9FF000000              	mov	rcx, ipbufln	; limit data
-   170 000000D9 E8(00000000)            	call	ReadString	; perform keyboard read
-   171 000000DE 48BA-                   	mov	rdx, ipbuf	; address numeral input area
-   171 000000E0 [6E00000000000000] 
-   172 000000E8 4889C1                  	mov	rcx, rax	; numeral count
-   173 000000EB E8(00000000)            	call	ParseInteger64	; parse signed binary from input, returned in RAX
-   174 000000F0 4883F800                	cmp	rax, 0 ; return of 0 from RAX indicates invalid input
-   175 000000F4 7460                    	je	invalid
-   176 000000F6 7C77                    	jl	negnum	; causes infinite loop
-   177 000000F8 4989C0                  	mov	r8, rax	; preserve original user input
-   178                                  	; indenting for ease of reading
-   179 000000FB 41BF01000000            	mov	r15, 1	; loop iterator variable
-   180                                  	fibloop	equ	$
-   181                                  		
-   182 00000101 4157                    		push	r15	; fib(R15)
-   183 00000103 E856FFFFFF              		call	fib
-   184 00000108 4883C408                		add	rsp, 8*1; clear R15 from stack
-   185                                  		; whaddaya know, fib() also returns RAX
-   186 0000010C E8(00000000)            		call	WriteInt	; print fib(n)
-   187 00000111 E8(00000000)            		call	Crlf
-   188 00000116 4D39C7                  		cmp	r15, r8		; compare user input w/ loop iterator
-   189 00000119 7405                    		je	goldrat		; if equal, leave loop
-   190 0000011B 49FFC7                  		inc	r15		; else, increment iterator + continue
-   191 0000011E EBE1                    		jmp	fibloop		; loop again
-   192                                  	; once more for golden ratio
-   193                                  goldrat	equ	$
-   194 00000120 4150                    	push	r8
-   195 00000122 E837FFFFFF              	call	fib
-   196 00000127 4883C408                	add	rsp, 8*1; clear r8 from stack
-   197 0000012B 4889C3                  	mov	rbx, rax
-   198 0000012E 4150                    	push	r8
-   199 00000130 E829FFFFFF              	call	fib
-   200 00000135 4883C408                	add	rsp, 8*1
-   201 00000139 50                      	push	rax
-   202 0000013A 53                      	push 	rbx
-   203 0000013B E8FBFEFFFF              	call	phi
-   204 00000140 4883C410                	add	rsp, 8*2
-   205                                  	; OK, for this I need to push an SSE register onto the stack
-   206                                  	; It is twice the size of a normal register
-   207                                  	; as such I cannot use push and pop
-   208                                  	; I need to do it manually
-   209 00000144 4883EC10                	sub	rsp, 8*2; subtract 16 bytes or 128 bits
-   210 00000148 F30F7F0424              	movdqu	[rsp], xmm0
-   211 0000014D E8AEFEFFFF              	call	fpcvt	; call floating point converter
-   212                                  	; pop xmm0
-   213 00000152 4883C410                	add	rsp, 8*2
+   154                                  ; END SUBROUTINE: fib
+   155                                  ;--------------------------------------------------------
+   156                                  
+   157                                  main:
+   158                                  
+   159                                  ; keep looping until user quits
+   160                                  loopnt	equ	$
+   161 000000BA E8(00000000)            	call	Crlf
+   162                                  
+   163 000000BF 48BA-                   	mov	rdx, prompt	; write user prompt
+   163 000000C1 [3200000000000000] 
+   164 000000C9 E8(00000000)            	call	WriteString
+   165 000000CE E8(00000000)            	call	Crlf
+   166                                  
+   167 000000D3 48BA-                   	mov	rdx, ipbuf	; address data buffer
+   167 000000D5 [6E00000000000000] 
+   168 000000DD B9FF000000              	mov	rcx, ipbufln	; limit data
+   169 000000E2 E8(00000000)            	call	ReadString	; perform keyboard read
+   170 000000E7 48BA-                   	mov	rdx, ipbuf	; address numeral input area
+   170 000000E9 [6E00000000000000] 
+   171 000000F1 4889C1                  	mov	rcx, rax	; numeral count
+   172 000000F4 E8(00000000)            	call	ParseInteger64	; parse signed binary from input, returned in RAX
+   173 000000F9 4883F800                	cmp	rax, 0 ; return of 0 from RAX indicates invalid input
+   174 000000FD 745A                    	je	invalid
+   175 000000FF 7C71                    	jl	negnum	; causes infinite loop
+   176 00000101 4989C0                  	mov	r8, rax	; preserve original user input
+   177                                  	; indenting for ease of reading
+   178 00000104 41BF01000000            	mov	r15, 1	; loop iterator variable
+   179                                  	fibloop	equ	$
+   180                                  		
+   181 0000010A 4157                    		push	r15	; fib(R15)
+   182 0000010C E856FFFFFF              		call	fib
+   183 00000111 4883C408                		add	rsp, 8*1; clear R15 from stack
+   184                                  		; whaddaya know, fib() also returns RAX
+   185 00000115 E8(00000000)            		call	WriteInt	; print fib(n)
+   186 0000011A E8(00000000)            		call	Crlf
+   187 0000011F 4D39C7                  		cmp	r15, r8		; compare user input w/ loop iterator
+   188 00000122 7405                    		je	goldrat		; if equal, leave loop
+   189 00000124 49FFC7                  		inc	r15		; else, increment iterator + continue
+   190 00000127 EBE1                    		jmp	fibloop		; loop again
+   191                                  	; once more for golden ratio
+   192                                  goldrat	equ	$
+   193 00000129 4150                    	push	r8
+   194 0000012B E837FFFFFF              	call	fib
+   195 00000130 4883C408                	add	rsp, 8*1; clear r8 from stack
+   196 00000134 4889C3                  	mov	rbx, rax
+   197 00000137 4150                    	push	r8
+   198 00000139 E829FFFFFF              	call	fib
+   199 0000013E 4883C408                	add	rsp, 8*1
+   200 00000142 50                      	push	rax
+   201 00000143 53                      	push 	rbx
+   202 00000144 E8F6FEFFFF              	call	phi
+   203 00000149 4883C410                	add	rsp, 8*2
+   204 0000014D 51                      	push	rcx
+   205 0000014E E8ADFEFFFF              	call	fpcvt
+   206 00000153 4883C408                	add	rsp, 8*1
+   207 00000157 EB32                    	jmp	term	
+   208                                  
+   209                                  invalid	equ	$
+   210 00000159 48BA-                   	mov	rdx, invmsg	; write invalid message
+   210 0000015B [6D01000000000000] 
+   211 00000163 E8(00000000)            	call	WriteString
+   212 00000168 E8(00000000)            	call	Crlf
+   213 0000016D E948FFFFFF              	jmp	loopnt		; loop back to beginning of subroutine
    214                                  
-   215                                  invalid	equ	$
-   216 00000156 48BA-                   	mov	rdx, invmsg	; write invalid message
-   216 00000158 [6D01000000000000] 
-   217 00000160 E8(00000000)            	call	WriteString
-   218 00000165 E8(00000000)            	call	Crlf
-   219 0000016A E942FFFFFF              	jmp	loopnt		; loop back to beginning of subroutine
+   215                                  negnum	equ	$
+   216 00000172 48BA-                   	mov	rdx, negmsg	; write negative numbers message
+   216 00000174 [1500000000000000] 
+   217 0000017C E8(00000000)            	call	WriteString
+   218 00000181 E8(00000000)            	call	Crlf
+   219 00000186 E92FFFFFFF              	jmp	loopnt		; loop back to beginning of subroutine
    220                                  
-   221                                  negnum	equ	$
-   222 0000016F 48BA-                   	mov	rdx, negmsg	; write negative numbers message
-   222 00000171 [1500000000000000] 
-   223 00000179 E8(00000000)            	call	WriteString
-   224 0000017E E8(00000000)            	call	Crlf
-   225 00000183 E929FFFFFF              	jmp	loopnt		; loop back to beginning of subroutine
+   221                                  term	equ	$
+   222 0000018B 48BA-                   	mov	rdx, eopmsg	; address message
+   222 0000018D [0000000000000000] 
+   223 00000195 E8(00000000)            	call	WriteString
+   224 0000019A E8(00000000)            	call	Crlf
+   225 0000019F B83C0000004831FF0F-     	Exit
+   225 000001A8 05                 
    226                                  
-   227                                  term	equ	$
-   228 00000188 48BA-                   	mov	rdx, eopmsg	; address message
-   228 0000018A [0000000000000000] 
-   229 00000192 E8(00000000)            	call	WriteString
-   230 00000197 E8(00000000)            	call	Crlf
-   231 0000019C B83C0000004831FF0F-     	Exit
-   231 000001A5 05                 
-   232                                  
-   233                                  
-   234                                  
+   227                                  
+   228                                  
