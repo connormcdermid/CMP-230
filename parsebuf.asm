@@ -10,12 +10,13 @@ section .data
 
 prompt 	db	"Please enter a sentence: ",0x00	; prompt and NULL
 ipbuf	times	255 db 0x20		; input buffer, populated with spaces
-ipbufl	equ	$-ipbuffer		; input buffer length, calculated with memory addresses
+ipbufl	equ	$-ipbuf		; input buffer length, calculated with memory addresses
 token	times 	255 db 0x00		; token buffer, populated with NULL to prevent print mangling
 tokmsg	db	"Token: ",0x00		; token message & NULL
 tokenpos resb	8			; reserve 8 bytes for tokenpos
-lenmsg	db	" of length "0x00	; token length message & NULL
+lenmsg	db	" of length ",0x00	; token length message & NULL
 toklen	db	0x0			; reserve space for token length
+termsg	db	"Program terminating.",0x00; termination message & NULL
 
 section .text
 ;-------------------------------------------------------------------------------------------------------
@@ -38,9 +39,9 @@ tokenposlen:
 
 	iter	equ	$	; top of consumption loop
 		inc	rdx		; increment cursor position
-		cmp	[rdx], 0x00	; if character is null-terminator
+		cmp	byte [rdx], 0x00; if character is null-terminator
 		je	return		; then return from subroutine
-		cmp	[rdx], 0x20	; all chars with value of 0x20 or less are whitespace
+		cmp	byte [rdx], 0x20; all chars with value of 0x20 or less are whitespace
 		jle	iter		; if the character is whitespace, loop again
 		mov	rax, rdx	; else, save index of token
 		jmp	tokl		; and goto tokl
@@ -48,7 +49,7 @@ tokenposlen:
 	tokl	equ	$	; token located
 		inc	rcx
 		inc	rdx	; next character
-		cmp	[rdx], 0x20	; all chars with value of 0x20 or less are whitespace
+		cmp	byte [rdx], 0x20; all chars with value of 0x20 or less are whitespace
 		jle	return	; if character is whitespace, the token has ended
 		jmp	tokl	; else, loop again
 
@@ -67,7 +68,7 @@ main:
 	mov	rdx, prompt	; load message address
 	call	WriteString	; program suspended for write to terminal
 	mov	rdx, ipbuf	; address data buffer
-	mov	rcx, ipbufl	; limit data
+	mov	rax, ipbufl	; limit data
 	call	ReadString	; program suspended for keyboard read
 	mov	rdx, ipbuf	; address data buffer
 	mov	byte [rdx + rax], 0x0; ensure string is null-terminated
@@ -78,30 +79,37 @@ loopnt	equ	$		; r11 is loop iterator/cursor
 	mov	rdx, r11	
 	push	rdx		; push rdx onto stack as parameter
 	call	tokenposlen	; call tokenposlen -- outputs in RAX, RCX
+	pop	rdx		; clean stack of rdx
 	cmp	rcx, 0x0	; if rcx is zero
 	je	term		; then terminate
 	mov	[tokenpos], rax ; else, store token position
-	mov	[tokenlen], rcx	; and store token length
+	mov	[toklen], rcx	; and store token length
 	mov	r11, rax	; update cursor position: put cursor at start of token found
 	add	r11, rcx	; update cursor position part 2 electric boogaloo: put cursor past located token
-	inc	r11		; update cursor position part 3: char after token must be whitespace, so consume
 	mov	r8, rax		; source address
 	mov	r9, token	; target address
 	mov	r10, rcx	; length of move
-	call	Movcl		; perform token move of r10 characters from [r8] to [r9]
+	call	Mvcl		; perform token move of r10 characters from [r8] to [r9]
 	mov	rdx, tokmsg	; address token message -- NOTE: CLOBBERS RDX
 	call	WriteString	; program suspended for write to terminal
-	mov	rdx, token	; address token proper
-	call	WriteString	; program suspended for write to terminal
-	mov	rdx, lenmgs	; address length message
+	;mov	rdx, token	; address token proper
+	;call	WriteString	; program suspended for write to terminal
+	; manual write to terminal because token is not null-terminated.
+	mov	rax, 1		; sys_write
+	mov	rdi, 1		; stdout
+	mov	rsi, token	; message address
+	mov	rdx, rcx	; message length, still contained in rcx
+	syscall			; program suspended for write to terminal
+	mov	rdx, lenmsg	; address length message
 	call	WriteString	; program suspended for write to terminal
 	mov	rax, [toklen] ; copy token length to RAX -- NOTE: CLOBBERS RAX
 	call	WriteInt	; program suspended for write to terminal
 	call	Crlf		; program suspended for write to terminal
+	
 	jmp	loopnt		; EOL not reached, repeat
 
 term	equ	$
 	mov	rdx, termsg	; address termination message
 	call	WriteString	; program suspended for write to terminal
 	call	Crlf		; program suspended for write to terminal
-	EXIT
+	Exit
