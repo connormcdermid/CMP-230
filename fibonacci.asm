@@ -17,6 +17,48 @@ invmsg	db	"Integer is not valid. Please try again."
 section .text
 
 ;--------------------------------------------------------
+; SUBROUTINE: phi
+; INPUTS: fib(n), fib(n - 1)
+; OUTPUTS: Golden ratio in RAX
+phi:
+	; subroutine prologue
+	push	rbp	; save caller base pointer
+	mov	rbp, rsp; new base pointer
+	;sub	rsp, x*8; allocate local vars
+	push	rbx	; save caller regs
+	push	rdx	; save caller regs
+
+	; subroutine body
+	mov	rdx, [rbp + 2*8]; retrieve first param
+	mov	rbx, [rbp + 3*8]; retrieve second param
+	mov	rax, rdx	; copy first param into RAX
+	cqo			; perpetuate RAX into RDX (RDX:RAX)
+	imul	10000000000000000000000000; multiply by random order of magnitude
+	idiv	rbx		; divide RDX:RAX by RBX, result in RAX, remainder in RDX
+	; discard remainder, I don't care
+	; return result in RAX
+	
+	; subroutine epilogue
+	pop	rdx	; restore caller regs
+	pop	rbx	; restore caller regs
+	;add	rsp, x*8; deallocate local vars
+	mov	rsp, rbp; restore caller stack pointer
+	pop	rbp	; restore caller base pointer
+;
+; END SUBROUTINE
+;--------------------------------------------------------
+
+;--------------------------------------------------------
+; SUBROUTINE: pprint
+; Prints the Golden Ratio
+; INPUTS: Golden Ratio
+; OUTPUTS: None.
+
+
+; END SUBROUTINE
+;--------------------------------------------------------
+
+;--------------------------------------------------------
 ; SUBROUTINE: fib
 ; INPUTS: Quantity
 ; OUTPUTS: Requested numbers in RAX

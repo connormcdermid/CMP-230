@@ -92,14 +92,14 @@ loopnt	equ	$		; r11 is loop iterator/cursor
 	call	Mvcl		; perform token move of r10 characters from [r8] to [r9]
 	mov	rdx, tokmsg	; address token message -- NOTE: CLOBBERS RDX
 	call	WriteString	; program suspended for write to terminal
-	;mov	rdx, token	; address token proper
-	;call	WriteString	; program suspended for write to terminal
+	mov	rdx, token	; address token proper
+	call	WriteString	; program suspended for write to terminal
 	; manual write to terminal because token is not null-terminated.
-	mov	rax, 1		; sys_write
-	mov	rdi, 1		; stdout
-	mov	rsi, token	; message address
-	mov	rdx, rcx	; message length, still contained in rcx
-	syscall			; program suspended for write to terminal
+	;mov	rax, 1		; sys_write
+	;mov	rdi, 1		; stdout
+	;mov	rsi, token	; message address
+	;mov	rdx, rcx	; message length, still contained in rcx
+	;syscall			; program suspended for write to terminal
 	mov	rdx, lenmsg	; address length message
 	call	WriteString	; program suspended for write to terminal
 	mov	rax, [toklen] ; copy token length to RAX -- NOTE: CLOBBERS RAX

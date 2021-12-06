@@ -408,7 +408,7 @@
     81 00000071 E88AFFFFFF              	call	tokenposlen	; call tokenposlen -- outputs in RAX, RCX
     82 00000076 5A                      	pop	rdx		; clean stack of rdx
     83 00000077 4883F900                	cmp	rcx, 0x0	; if rcx is zero
-    84 0000007B 7479                    	je	term		; then terminate
+    84 0000007B 746C                    	je	term		; then terminate
     85 0000007D 48890425[20020000]      	mov	[tokenpos], rax ; else, store token position
     86 00000085 48890C25[34020000]      	mov	[toklen], rcx	; and store token length
     87 0000008D 4989C3                  	mov	r11, rax	; update cursor position: put cursor at start of token found
@@ -421,28 +421,28 @@
     93 000000A8 48BA-                   	mov	rdx, tokmsg	; address token message -- NOTE: CLOBBERS RDX
     93 000000AA [1802000000000000] 
     94 000000B2 E8(00000000)            	call	WriteString	; program suspended for write to terminal
-    95                                  	;mov	rdx, token	; address token proper
-    96                                  	;call	WriteString	; program suspended for write to terminal
+    95 000000B7 48BA-                   	mov	rdx, token	; address token proper
+    95 000000B9 [1901000000000000] 
+    96 000000C1 E8(00000000)            	call	WriteString	; program suspended for write to terminal
     97                                  	; manual write to terminal because token is not null-terminated.
-    98 000000B7 B801000000              	mov	rax, 1		; sys_write
-    99 000000BC BF01000000              	mov	rdi, 1		; stdout
-   100 000000C1 48BE-                   	mov	rsi, token	; message address
-   100 000000C3 [1901000000000000] 
-   101 000000CB 4889CA                  	mov	rdx, rcx	; message length, still contained in rcx
-   102 000000CE 0F05                    	syscall			; program suspended for write to terminal
-   103 000000D0 48BA-                   	mov	rdx, lenmsg	; address length message
-   103 000000D2 [2802000000000000] 
-   104 000000DA E8(00000000)            	call	WriteString	; program suspended for write to terminal
-   105 000000DF 488B0425[34020000]      	mov	rax, [toklen] ; copy token length to RAX -- NOTE: CLOBBERS RAX
-   106 000000E7 E8(00000000)            	call	WriteInt	; program suspended for write to terminal
-   107 000000EC E8(00000000)            	call	Crlf		; program suspended for write to terminal
+    98                                  	;mov	rax, 1		; sys_write
+    99                                  	;mov	rdi, 1		; stdout
+   100                                  	;mov	rsi, token	; message address
+   101                                  	;mov	rdx, rcx	; message length, still contained in rcx
+   102                                  	;syscall			; program suspended for write to terminal
+   103 000000C6 48BA-                   	mov	rdx, lenmsg	; address length message
+   103 000000C8 [2802000000000000] 
+   104 000000D0 E8(00000000)            	call	WriteString	; program suspended for write to terminal
+   105 000000D5 488B0425[34020000]      	mov	rax, [toklen] ; copy token length to RAX -- NOTE: CLOBBERS RAX
+   106 000000DD E8(00000000)            	call	WriteInt	; program suspended for write to terminal
+   107 000000E2 E8(00000000)            	call	Crlf		; program suspended for write to terminal
    108                                  	
-   109 000000F1 E977FFFFFF              	jmp	loopnt		; EOL not reached, repeat
+   109 000000E7 EB84                    	jmp	loopnt		; EOL not reached, repeat
    110                                  
    111                                  term	equ	$
-   112 000000F6 48BA-                   	mov	rdx, termsg	; address termination message
-   112 000000F8 [3502000000000000] 
-   113 00000100 E8(00000000)            	call	WriteString	; program suspended for write to terminal
-   114 00000105 E8(00000000)            	call	Crlf		; program suspended for write to terminal
-   115 0000010A B83C0000004831FF0F-     	Exit
-   115 00000113 05                 
+   112 000000E9 48BA-                   	mov	rdx, termsg	; address termination message
+   112 000000EB [3502000000000000] 
+   113 000000F3 E8(00000000)            	call	WriteString	; program suspended for write to terminal
+   114 000000F8 E8(00000000)            	call	Crlf		; program suspended for write to terminal
+   115 000000FD B83C0000004831FF0F-     	Exit
+   115 00000106 05                 
