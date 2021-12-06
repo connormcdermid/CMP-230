@@ -359,7 +359,7 @@
     35                                  	; subroutine body
     36 00000005 488B5510                	mov	rdx, [rbp + 16] ; retrieve parameter 1 -- cursor position
     37 00000009 4889D0                  	mov	rax, rdx	; move cursor position into RAX
-    38 0000000C 4831C9                  	xor	rcx, rcx	; set rcx to 0
+    38 0000000C 4831C9                  	xor	rcx, rcx	; set rcx to 0 to start the loop
     39                                  
     40                                  	iter	equ	$	; top of consumption loop
     41 0000000F 48FFC2                  		inc	rdx		; increment cursor position
@@ -400,49 +400,52 @@
     73 0000005E [1A00000000000000] 
     74 00000066 C6040200                	mov	byte [rdx + rax], 0x0; ensure string is null-terminated
     75 0000006A 4989D3                  	mov	r11, rdx	; copy data buffer pointer to r11
-    76                                  	
-    77                                  
-    78                                  loopnt	equ	$		; r11 is loop iterator/cursor
-    79 0000006D 4C89DA                  	mov	rdx, r11	
-    80 00000070 52                      	push	rdx		; push rdx onto stack as parameter
-    81 00000071 E88AFFFFFF              	call	tokenposlen	; call tokenposlen -- outputs in RAX, RCX
-    82 00000076 5A                      	pop	rdx		; clean stack of rdx
-    83 00000077 4883F900                	cmp	rcx, 0x0	; if rcx is zero
-    84 0000007B 746C                    	je	term		; then terminate
-    85 0000007D 48890425[20020000]      	mov	[tokenpos], rax ; else, store token position
-    86 00000085 48890C25[34020000]      	mov	[toklen], rcx	; and store token length
-    87 0000008D 4989C3                  	mov	r11, rax	; update cursor position: put cursor at start of token found
-    88 00000090 4901CB                  	add	r11, rcx	; update cursor position part 2 electric boogaloo: put cursor past located token
-    89 00000093 4989C0                  	mov	r8, rax		; source address
-    90 00000096 49B9-                   	mov	r9, token	; target address
-    90 00000098 [1901000000000000] 
-    91 000000A0 4989CA                  	mov	r10, rcx	; length of move
-    92 000000A3 E8(00000000)            	call	Mvcl		; perform token move of r10 characters from [r8] to [r9]
-    93 000000A8 48BA-                   	mov	rdx, tokmsg	; address token message -- NOTE: CLOBBERS RDX
-    93 000000AA [1802000000000000] 
-    94 000000B2 E8(00000000)            	call	WriteString	; program suspended for write to terminal
-    95 000000B7 48BA-                   	mov	rdx, token	; address token proper
-    95 000000B9 [1901000000000000] 
-    96 000000C1 E8(00000000)            	call	WriteString	; program suspended for write to terminal
-    97                                  	; manual write to terminal because token is not null-terminated.
-    98                                  	;mov	rax, 1		; sys_write
-    99                                  	;mov	rdi, 1		; stdout
-   100                                  	;mov	rsi, token	; message address
-   101                                  	;mov	rdx, rcx	; message length, still contained in rcx
-   102                                  	;syscall			; program suspended for write to terminal
-   103 000000C6 48BA-                   	mov	rdx, lenmsg	; address length message
-   103 000000C8 [2802000000000000] 
-   104 000000D0 E8(00000000)            	call	WriteString	; program suspended for write to terminal
-   105 000000D5 488B0425[34020000]      	mov	rax, [toklen] ; copy token length to RAX -- NOTE: CLOBBERS RAX
-   106 000000DD E8(00000000)            	call	WriteInt	; program suspended for write to terminal
-   107 000000E2 E8(00000000)            	call	Crlf		; program suspended for write to terminal
-   108                                  	
-   109 000000E7 EB84                    	jmp	loopnt		; EOL not reached, repeat
-   110                                  
-   111                                  term	equ	$
-   112 000000E9 48BA-                   	mov	rdx, termsg	; address termination message
-   112 000000EB [3502000000000000] 
-   113 000000F3 E8(00000000)            	call	WriteString	; program suspended for write to terminal
-   114 000000F8 E8(00000000)            	call	Crlf		; program suspended for write to terminal
-   115 000000FD B83C0000004831FF0F-     	Exit
-   115 00000106 05                 
+    76 0000006D 49FFCB                  	dec	r11		; need to decrement pointer when setting iterator, otherwise
+    77                                  				; it skips the first character
+    78                                  	
+    79                                  
+    80                                  loopnt	equ	$		; r11 is loop iterator/cursor
+    81 00000070 4C89DA                  	mov	rdx, r11	
+    82 00000073 52                      	push	rdx		; push rdx onto stack as parameter
+    83 00000074 E887FFFFFF              	call	tokenposlen	; call tokenposlen -- outputs in RAX, RCX
+    84 00000079 5A                      	pop	rdx		; clean stack of rdx
+    85 0000007A 4883F900                	cmp	rcx, 0x0	; if rcx is zero
+    86 0000007E 7477                    	je	term		; then terminate
+    87 00000080 48890425[20020000]      	mov	[tokenpos], rax ; else, store token position
+    88 00000088 48890C25[34020000]      	mov	[toklen], rcx	; and store token length
+    89 00000090 4989C3                  	mov	r11, rax	; update cursor position: put cursor at start of token found
+    90 00000093 4901CB                  	add	r11, rcx	; update cursor position part 2 electric boogaloo: put cursor past located token
+    91 00000096 4989C0                  	mov	r8, rax		; source address
+    92 00000099 49B9-                   	mov	r9, token	; target address
+    92 0000009B [1901000000000000] 
+    93 000000A3 4989CA                  	mov	r10, rcx	; length of move
+    94 000000A6 E8(00000000)            	call	Mvcl		; perform token move of r10 characters from [r8] to [r9]
+    95 000000AB 41C682[19010000]00      	mov	byte [token + r10], 0x00; add a null-terminator
+    96 000000B3 48BA-                   	mov	rdx, tokmsg	; address token message -- NOTE: CLOBBERS RDX
+    96 000000B5 [1802000000000000] 
+    97 000000BD E8(00000000)            	call	WriteString	; program suspended for write to terminal
+    98 000000C2 48BA-                   	mov	rdx, token	; address token proper
+    98 000000C4 [1901000000000000] 
+    99 000000CC E8(00000000)            	call	WriteString	; program suspended for write to terminal
+   100                                  	; manual write to terminal because token is not null-terminated.
+   101                                  	;mov	rax, 1		; sys_write
+   102                                  	;mov	rdi, 1		; stdout
+   103                                  	;mov	rsi, token	; message address
+   104                                  	;mov	rdx, rcx	; message length, still contained in rcx
+   105                                  	;syscall			; program suspended for write to terminal
+   106 000000D1 48BA-                   	mov	rdx, lenmsg	; address length message
+   106 000000D3 [2802000000000000] 
+   107 000000DB E8(00000000)            	call	WriteString	; program suspended for write to terminal
+   108 000000E0 488B0425[34020000]      	mov	rax, [toklen] ; copy token length to RAX -- NOTE: CLOBBERS RAX
+   109 000000E8 E8(00000000)            	call	WriteInt	; program suspended for write to terminal
+   110 000000ED E8(00000000)            	call	Crlf		; program suspended for write to terminal
+   111                                  	
+   112 000000F2 E979FFFFFF              	jmp	loopnt		; EOL not reached, repeat
+   113                                  
+   114                                  term	equ	$
+   115 000000F7 48BA-                   	mov	rdx, termsg	; address termination message
+   115 000000F9 [3502000000000000] 
+   116 00000101 E8(00000000)            	call	WriteString	; program suspended for write to terminal
+   117 00000106 E8(00000000)            	call	Crlf		; program suspended for write to terminal
+   118 0000010B B83C0000004831FF0F-     	Exit
+   118 00000114 05                 

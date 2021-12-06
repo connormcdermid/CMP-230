@@ -35,7 +35,7 @@ tokenposlen:
 	; subroutine body
 	mov	rdx, [rbp + 16] ; retrieve parameter 1 -- cursor position
 	mov	rax, rdx	; move cursor position into RAX
-	xor	rcx, rcx	; set rcx to 0
+	xor	rcx, rcx	; set rcx to 0 to start the loop
 
 	iter	equ	$	; top of consumption loop
 		inc	rdx		; increment cursor position
@@ -73,6 +73,8 @@ main:
 	mov	rdx, ipbuf	; address data buffer
 	mov	byte [rdx + rax], 0x0; ensure string is null-terminated
 	mov	r11, rdx	; copy data buffer pointer to r11
+	dec	r11		; need to decrement pointer when setting iterator, otherwise
+				; it skips the first character
 	
 
 loopnt	equ	$		; r11 is loop iterator/cursor
@@ -90,6 +92,7 @@ loopnt	equ	$		; r11 is loop iterator/cursor
 	mov	r9, token	; target address
 	mov	r10, rcx	; length of move
 	call	Mvcl		; perform token move of r10 characters from [r8] to [r9]
+	mov	byte [token + r10], 0x00; add a null-terminator
 	mov	rdx, tokmsg	; address token message -- NOTE: CLOBBERS RDX
 	call	WriteString	; program suspended for write to terminal
 	mov	rdx, token	; address token proper
